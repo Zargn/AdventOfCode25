@@ -1,15 +1,23 @@
 use std::error::Error;
 
-mod reader;
-use reader::get_lines;
 mod data_parser;
 mod operations;
-use data_parser::{DataParser, ParserRules};
+mod reader;
+
+/*
+Part One:
+
+
+
+Part Two:
+
+
+
+*/
 
 fn load_data(path: &str) -> Result<(), Box<dyn Error>> {
     let lines = reader::get_lines(path)?;
 
-    DataParser::new(ParserRules {}, Box::new(lines));
     todo!();
 }
 
@@ -49,4 +57,4 @@ fn calculate_small_test() {
         ),
         Err(err) => panic!("Error occured:\n{}", err),
     }
-}
+} // */
