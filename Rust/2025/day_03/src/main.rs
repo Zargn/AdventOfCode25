@@ -31,6 +31,29 @@ This would allow us to skip some of the extra stuff after the loop.
 
 Part Two:
 
+We still have a list of numbers but now we need to select 12 digits instead of 2 with the
+same rules as before.
+
+The first idea for this is to:
+Keep a count of how many digits is left to select.
+Have a list of (digit, index) values.
+Have highest_value, value_index and index variables.
+In a while loop:
+    - If index >= batteries in the battery bank - digits left to select:
+        - Set index to value_index + 1.
+        - Add highest_value and value_index to the list and clear the old values.
+        - Subtract 1 from digits left to select.
+        If digits left to select <= 0:
+            - Break loop.
+
+    - Get the battery at index.
+    - If the battery is higher then highest_value:
+        - Set highest value to battery.
+        - Set value_index to index.
+
+    Add 1 to index.
+return the list of digits assembled into a full 12 digit integer.
+
 
 
 */
@@ -83,7 +106,7 @@ fn main() {
 
 #[test]
 fn calculate_test() {
-    let expected_value = 357;
+    let expected_value = 3121910778619;
     match calculate("testdata.txt") {
         Ok(value) => assert_eq!(
             value, expected_value,
