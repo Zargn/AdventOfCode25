@@ -21,6 +21,12 @@ After the loop check if the final number is larger than the second highest. If y
 replace the second highest with the last number.
 Return (first highest value * 10) + second highest value.
 
+Improvement idea:
+Instead of comparing the battery in the else if statement we would:
+    - Replace else if with just if.
+    - Replace the battery with the battery after the current one.
+This would allow us to skip some of the extra stuff after the loop.
+
 
 
 Part Two:
@@ -43,34 +49,26 @@ impl BatteryBank {
     }
 
     fn joltage(&self) -> u8 {
-        let mut highest = 0;
-        let mut second_highest = 0;
-
+        let (mut highest, mut second_highest) = (0, 0);
         for i in 0..self.batteries.len() - 1 {
             let battery = self.batteries[i];
             if battery > highest {
                 highest = battery;
                 second_highest = 0;
-            } else if battery > second_highest {
-                second_highest = battery;
+            }
+            let next_battery = self.batteries[i + 1];
+            if next_battery > second_highest {
+                second_highest = next_battery;
             }
         }
-        let last_battery = self.batteries[self.batteries.len() - 1];
-        if last_battery > second_highest {
-            second_highest = last_battery;
-        }
-
         (highest * 10) + second_highest
     }
 }
 
 fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-    let lines = reader::get_lines(data_path)?;
     let mut count: u64 = 0;
-    for line in lines {
-        let battery_bank = BatteryBank::parse(&line)?;
-        let joltage = battery_bank.joltage();
-        count += joltage as u64;
+    for line in reader::get_lines(data_path)? {
+        count += BatteryBank::parse(&line)?.joltage() as u64;
     }
 
     Ok(count)
