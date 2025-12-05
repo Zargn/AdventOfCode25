@@ -32,14 +32,14 @@ struct IDRange {
 }
 
 impl IDRange {
+    fn in_range(&self, value: &u64) -> bool {
+        self.lower <= *value && *value <= self.upper
+    }
+
     fn parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
         let mut parts = data_string.split('-');
         let (Some(lower), Some(upper)) = (parts.next(), parts.next()) else {
-            return Err(format!(
-                "Could not parse IDRange from data string: [{}]!",
-                data_string
-            )
-            .into());
+            return Err("Invalid Range Format".into());
         };
         Ok(IDRange {
             upper: upper.parse()?,
@@ -47,8 +47,14 @@ impl IDRange {
         })
     }
 
-    fn in_range(&self, value: &u64) -> bool {
-        self.lower <= *value && *value <= self.upper
+    /// Compressed version of parse().
+    /// Does the same thing but with less code.
+    fn compressed_parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
+        let mut parts = data_string.split('-');
+        Ok(IDRange {
+            lower: parts.next().ok_or("Invalid Range Format")?.parse()?,
+            upper: parts.next().ok_or("Invalid Range Format")?.parse()?,
+        })
     }
 }
 
@@ -82,8 +88,33 @@ fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
     Ok(fresh_ingredients)
 }
 
+/// Compressed version of calculate.
+/// Does the same thing as calculate() but with more compact code. Sacrifices some error clarity.
+fn compressed_calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+    let lines: Vec<String> = reader::get_lines(data_path)?.collect();
+    let mut ranges: Vec<IDRange> = Vec::new();
+
+    for line in lines.iter().take_while(|line| !line.is_empty()) {
+        ranges.push(IDRange::compressed_parse(line)?);
+    }
+
+    let mut fresh_ingredients: u64 = 0;
+    for line in lines.iter().skip(ranges.len() + 1) {
+        let value: u64 = line.parse()?;
+        if ranges.iter().any(|range| range.in_range(&value)) {
+            fresh_ingredients += 1;
+        }
+    }
+
+    Ok(fresh_ingredients)
+}
+
 fn main() {
     match calculate("data.txt") {
+        Ok(value) => println!("Result:\n{}", value),
+        Err(err) => println!("Error occured:\n{}", err),
+    }
+    match compressed_calculate("data.txt") {
         Ok(value) => println!("Result:\n{}", value),
         Err(err) => println!("Error occured:\n{}", err),
     }
@@ -93,6 +124,19 @@ fn main() {
 fn calculate_test() {
     let expected_value = 3;
     match calculate("testdata.txt") {
+        Ok(value) => assert_eq!(
+            value, expected_value,
+            "Program using testdata.txt finished but result was wrong! Expected: {} but received: {}",
+            expected_value, value
+        ),
+        Err(err) => panic!("Error occured:\n{}", err),
+    }
+}
+
+#[test]
+fn compressed_calculate_test() {
+    let expected_value = 3;
+    match compressed_calculate("testdata.txt") {
         Ok(value) => assert_eq!(
             value, expected_value,
             "Program using testdata.txt finished but result was wrong! Expected: {} but received: {}",
