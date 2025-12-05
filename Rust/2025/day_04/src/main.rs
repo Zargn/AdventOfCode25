@@ -7,17 +7,17 @@ mod reader;
 /*
 Part One:
 
-This time we have a grid of either empty or occupied tiles.
-We need to figure out which occupied tiles have at most 4 other occupied tiles in the surrounding 8 tiles.
+This time we have a grid of either empty or paper tiles.
+We need to figure out which paper tiles have at most 4 other occupied tiles in the surrounding 8 tiles.
 
 We need to build a two dimensional array of tiles first.
 Then iterate thorugh all tiles.
-For each occupied tile we chack the surrounding 8 for other occupied tiles and count them.
-If there are at most 3 other occupied tiles then add 1 to a counter.
+For each paper tile we chack the surrounding 8 for other occupied tiles and count them.
+If there are at most 3 other paper tiles then add 1 to a counter.
 
-To check the surrounding tiles for occupied tiles we could code it to only check those tiles ignoring the
+To check the surrounding tiles for paper tiles we could code it to only check those tiles ignoring the
 current one. But it might be better to check all 9 tiles in a square and just increase the allowed tiles
-by one. (Since the center tile would always be occupied.)
+by one. (Since the center tile would always be paper.)
 
 Once all tiles have been visited then return the count value.
 
@@ -29,12 +29,12 @@ check that the tile being checked is within the array.
 
 Part Two:
 
-We now have permission to remove occupied tiles if they are accessible. Meaning occupied tiles that wasn't
+We now have permission to remove paper tiles if they are accessible. Meaning occupied tiles that wasn't
 accessible could be accessible after another is removed.
 
 The fastest to implement solution to this would be to simply edit the is_accessible method to also remove
-the occupied tile if it is accessible.
-Then we would simply call accessible_tiles over and over again untill the return value is 0.
+the paper tile if it is accessible.
+Then we would simply call collect_paper over and over again untill the return value is 0.
 
 It is not the most "efficient" solution, but it would be very easy to modify the existing code to work.
 A more efficient solution would require a larger redesign of the system. Not impossible but it would
@@ -47,14 +47,14 @@ still demand quite a lot more work.
 #[derive(Clone, Copy)]
 enum Tile {
     Empty,
-    Occupied,
+    Paper,
 }
 
 impl Tile {
     fn parse(char: char) -> Result<Tile, Box<dyn Error>> {
         match char {
             '.' => Ok(Tile::Empty),
-            '@' => Ok(Tile::Occupied),
+            '@' => Ok(Tile::Paper),
             _ => Err(format!("Tile parse error! Invalid character [{char}]!").into()),
         }
     }
@@ -75,7 +75,7 @@ impl Map {
         let mut size_override = 0;
         for (y, line) in lines.enumerate() {
             for (x, char) in line.chars().enumerate() {
-                grid[x + 1][y + 1] = Tile::parse(char)?;
+                grid[x + 1][y + 1] = Tile::parse(char)?; // +1 to give space around the edges.
             }
             size_override = y + 1;
         }
@@ -86,8 +86,8 @@ impl Map {
         })
     }
 
-    fn accessible_tiles(&self) -> u64 {
-        let mut accessible_tiles = 0;
+    fn collect_paper(&mut self) -> u64 {
+        let mut paper_collected = 0;
         for y in 1..self.size_override + 1 {
             for x in 1..self.size_override + 1 {
                 if let Tile::Empty = self.grid[x][y] {
@@ -95,23 +95,24 @@ impl Map {
                 }
 
                 if self.is_accessible(x, y) {
-                    accessible_tiles += 1;
+                    paper_collected += 1;
+                    self.grid[x][y] = Tile::Empty;
                 }
             }
         }
-        accessible_tiles
+        paper_collected
     }
 
-    fn is_accessible(&self, c_x: usize, c_y: usize) -> bool {
-        let mut occupied = 0;
+    fn is_accessible(&mut self, c_x: usize, c_y: usize) -> bool {
+        let mut surrounding_paper = 0;
         for y in c_y - 1..=c_y + 1 {
             for x in c_x - 1..=c_x + 1 {
-                if let Tile::Occupied = self.grid[x][y] {
-                    occupied += 1;
+                if let Tile::Paper = self.grid[x][y] {
+                    surrounding_paper += 1;
                 }
             }
         }
-        occupied <= 4
+        surrounding_paper <= 4
     }
 
     /// Debug code to print the map in the same format as the data file.
@@ -120,8 +121,8 @@ impl Map {
         for y in 1..self.size_override + 1 {
             for x in 1..self.size_override + 1 {
                 match self.grid[x][y] {
-                    Tile::Empty => print!("."),
-                    Tile::Occupied => print!("@"),
+                    Tile::Empty => print!(".."),
+                    Tile::Paper => print!("@@"),
                 }
             }
             println!();
@@ -130,8 +131,17 @@ impl Map {
 }
 
 fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-    let map = Map::load_from_file(data_path)?;
-    Ok(map.accessible_tiles())
+    let mut map = Map::load_from_file(data_path)?;
+    let mut paper_collected = 0;
+    loop {
+        let paper = map.collect_paper();
+        if paper == 0 {
+            break;
+        }
+        paper_collected += paper;
+    }
+
+    Ok(paper_collected)
 }
 
 fn main() {
@@ -153,17 +163,3 @@ fn calculate_test() {
         Err(err) => panic!("Error occured:\n{}", err),
     }
 }
-
-/*
-#[test]
-fn calculate_small_test() {
-    let expected_value = 0;
-    match calculate("smalltestdata.txt") {
-        Ok(value) => assert_eq!(
-            value, expected_value,
-            "Program using smalltestdata.txt finished but result was wrong! Expected: {} but received: {}",
-            expected_value, value
-        ),
-        Err(err) => panic!("Error occured:\n{}", err),
-    }
-} // */
