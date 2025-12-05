@@ -22,6 +22,35 @@ If the value fits in a range then add 1 to a counter.
 
 Part Two:
 
+At first glance part two seems simple. We just need to add together the ranges in the data file and count
+how many valid IDs can exist.
+But the issue is that some ranges overlap. So we need to somehow detect that and prevent counting the same
+id twice.
+
+One solution to this is to simple count all of them and place each value in a hashset to track if it has
+been counted before. But the memory usage for this would be huge, and the performance would likely also
+suffer.
+
+Another option would be to combine the ranges before counting them.
+Basically iterate through the ranges checking if they overlap. If two overlap then remove them both and
+create a new one with their ranges combined.
+
+This could be done by:
+
+for range in ranges
+    let i = 0
+    while i < ranges.len()
+        other_range = ranges[i]
+        if other_range overlaps with range
+            add other_range to range
+            remove other_range from the list
+            i = 0 // Reset loop to check if earlier ranges overlap with the new range
+
+This should be enough to merge any overlapping ranges.
+
+Then count the total by looping through all ranges adding the following to the total
+range.upper - range.lower
+
 
 
 */
@@ -109,6 +138,10 @@ fn compressed_calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
     Ok(fresh_ingredients)
 }
 
+fn calculate_part_two(data_path: &str) -> Result<u64, Box<dyn Error>> {
+    todo!();
+}
+
 fn main() {
     match calculate("data.txt") {
         Ok(value) => println!("Result:\n{}", value),
@@ -118,10 +151,28 @@ fn main() {
         Ok(value) => println!("Result:\n{}", value),
         Err(err) => println!("Error occured:\n{}", err),
     }
+    println!("Part Two:");
+    match calculate("data.txt") {
+        Ok(value) => println!("Result:\n{}", value),
+        Err(err) => println!("Error occured:\n{}", err),
+    }
 }
 
 #[test]
 fn calculate_test() {
+    let expected_value = 3;
+    match calculate("testdata.txt") {
+        Ok(value) => assert_eq!(
+            value, expected_value,
+            "Program using testdata.txt finished but result was wrong! Expected: {} but received: {}",
+            expected_value, value
+        ),
+        Err(err) => panic!("Error occured:\n{}", err),
+    }
+}
+
+#[test]
+fn calculate_part_two_test() {
     let expected_value = 3;
     match calculate("testdata.txt") {
         Ok(value) => assert_eq!(
