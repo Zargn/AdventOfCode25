@@ -46,6 +46,43 @@ Once the loop is done add temp_value to sum and return the result
 
 */
 
+fn calculate(path: &str) -> Result<u64, Box<dyn Error>> {
+    let lines: Vec<Vec<char>> = reader::get_lines(path)?
+        .map(|line| line.chars().collect())
+        .collect();
+
+    let line_length = lines[0].len();
+    if lines.iter().any(|line| line.len() != line_length) {
+        println!("{:?}", lines);
+        return Err("The data lines does not have the same lenth!".into());
+    }
+
+    let (mut sum, mut operator) = (0, Operator::Add(0));
+    for i in 0..lines[0].len() {
+        if let Ok(new_operator) = Operator::parse(&lines[lines.len() - 1][i].to_string()) {
+            sum += operator.value();
+            println!("Value: {}", operator.value());
+            operator = new_operator;
+        }
+
+        if let Ok(value) = {
+            let mut s = String::new();
+            for line in lines.iter().take(lines.len() - 1) {
+                if line[i] != ' ' {
+                    s.push(line[i]);
+                }
+            }
+            s.parse::<u16>()
+        } {
+            operator.combine(&value);
+            print!(" {value} ");
+        }
+    }
+    sum += operator.value();
+
+    Ok(sum)
+}
+
 enum Operator {
     Add(u64),
     Mul(u64),
@@ -75,7 +112,7 @@ impl Operator {
     }
 }
 
-fn calculate(path: &str, value_lines_override: usize) -> Result<u64, Box<dyn Error>> {
+fn old_calculate(path: &str, value_lines_override: usize) -> Result<u64, Box<dyn Error>> {
     let mut lines = reader::get_lines(path)?;
 
     let mut value_lines: [Vec<u16>; 4] = [const { Vec::new() }; 4];
@@ -126,7 +163,7 @@ fn calculate(path: &str, value_lines_override: usize) -> Result<u64, Box<dyn Err
 }
 
 fn main() {
-    match calculate("data.txt", 4) {
+    match calculate("data.txt") {
         Ok(value) => println!("Result:\n{}", value),
         Err(err) => println!("Error occured:\n{}", err),
     }
@@ -135,7 +172,7 @@ fn main() {
 #[test]
 fn calculate_test() {
     let expected_value = 3263827;
-    match calculate("testdata.txt", 3) {
+    match calculate("testdata.txt") {
         Ok(value) => assert_eq!(
             value, expected_value,
             "Program using testdata.txt finished but result was wrong! Expected: {} but received: {}",
