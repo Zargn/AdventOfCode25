@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{collections::VecDeque, error::Error};
 
 mod data_parser;
 mod operations;
@@ -64,6 +64,11 @@ Loop dequeuing one beam at a time until the queue is empty
 
 Return timeline count
 
+Update:
+This solution works for the test value but takes ages for the full data.
+I think it will get to the correct solution but I don't know if it takes 10 minutes or 5
+years. Need to redesign it to be more efficient.
+
 
 
 */
@@ -98,7 +103,37 @@ fn calculate_part_one(data_path: &str) -> Result<u64, Box<dyn Error>> {
 }
 
 fn calculate_part_two(data_path: &str) -> Result<u64, Box<dyn Error>> {
-    todo!();
+    let grid: Vec<Vec<char>> = reader::get_lines(data_path)?
+        .map(|line| line.chars().collect())
+        .collect();
+
+    if grid.iter().any(|line| line.len() != grid[0].len()) {
+        return Err("The data lines does not have the same lenth!".into());
+    }
+
+    let (mut beams, mut timelines): (VecDeque<(usize, usize)>, u64) = (VecDeque::new(), 0);
+    for (x, c) in grid[0].iter().enumerate() {
+        if *c == 'S' {
+            beams.push_back((x, 0));
+        }
+    }
+
+    while let Some((x, y)) = beams.pop_front() {
+        if y + 1 >= grid.len() {
+            timelines += 1;
+            continue;
+        }
+        match grid[y + 1][x] {
+            '.' => beams.push_back((x, y + 1)),
+            '^' => {
+                beams.push_back((x - 1, y + 1));
+                beams.push_back((x + 1, y + 1));
+            }
+            _ => return Err("Invalid character in grid!".into()),
+        }
+    }
+
+    Ok(timelines)
 }
 
 fn main() {
