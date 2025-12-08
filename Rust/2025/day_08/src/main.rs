@@ -1,3 +1,4 @@
+use core::f32;
 use std::error::Error;
 
 mod reader;
@@ -39,8 +40,55 @@ When saving the different points in the network we don't need to use the actual 
 better to simply use the index that point has in the coordinate list.
 */
 
+struct JunctionBox {
+    x: f32,
+    y: f32,
+    z: f32,
+    network_id: usize,
+}
+
+impl JunctionBox {
+    fn parse(data_string: &str) -> Result<JunctionBox, Box<dyn Error>> {
+        let mut parts = data_string.split(',');
+        Ok(JunctionBox {
+            x: parts.next().ok_or("Missing x coordinate.")?.parse()?,
+            y: parts.next().ok_or("Missing y coordinate.")?.parse()?,
+            z: parts.next().ok_or("Missing z coordinate.")?.parse()?,
+            network_id: usize::max_value(),
+        })
+    }
+
+    fn distance(&self, other: &JunctionBox) -> f32 {
+        ((self.x - other.x).powi(2) + (self.y - other.y).powi(2) + (self.z - other.z).powi(2))
+            .sqrt()
+    }
+}
+
 fn calculate_part_one(data_path: &str) -> Result<u64, Box<dyn Error>> {
     let lines = reader::get_lines(data_path)?;
+    let mut coordinates: Vec<JunctionBox> = Vec::new();
+    for line in lines {
+        coordinates.push(JunctionBox::parse(&line)?);
+    }
+
+    let networks: Vec<Vec<usize>> = Vec::new();
+
+    for coordinate_index in 0..coordinates.len() {
+        let (mut closest_distance, mut closest_distance_index) = (f32::MAX, 0);
+        let junction_box = &coordinates[coordinate_index];
+        for (i, other_junction_box) in coordinates.iter().skip(coordinate_index + 1).enumerate() {
+            // If it is closer than closest_coordinate then override those values
+            // d=\sqrt{(x_{2}-x_{1})^{2}+(y_{2}-y_{1})^{2}+(z_{2}-z_{1})^{2}}\)
+            let distance = junction_box.distance(other_junction_box);
+            if closest_distance > distance {
+                closest_distance = distance;
+                closest_distance_index = i;
+            }
+        }
+
+        // Closest distance has been found.
+        // Network logic required next.
+    }
 
     Err("Not implemented!".into())
 }
