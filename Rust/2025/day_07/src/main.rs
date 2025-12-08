@@ -69,6 +69,56 @@ This solution works for the test value but takes ages for the full data.
 I think it will get to the correct solution but I don't know if it takes 10 minutes or 5
 years. Need to redesign it to be more efficient.
 
+We need to stop processing the same split multiple times.
+Ideally we would process the grid one line at a time again. But instead of just ignoring
+if a beam exists at a location we save the beam with a value. Where the value holds how
+many beams have reached that tile. Then when a split occurs both split beams get that
+same value, plus any potential existing value from other beams.
+
+If we modify the original solution:
+
+Load the data into a grid
+Set the tile at location 'S' to a beam
+
+Iterate through the grid line by line until the second last line
+    Iterate through each tile of the line
+        If the tile is a beam:
+            If the tile below the current is a:
+            Empty space/Beam:
+                Set tile below to a beam
+            Splitter:
+                Set the tiles next to the one below to beams
+                Increase split counter by one
+return split count
+
+to this:
+
+Load the data into a grid
+Set the tile at location 'S' to a beam
+
+beam_strenght hashmap with (x, y) as a key and a int as a value.
+
+Iterate through the grid line by line until the second last line
+    Iterate through each tile of the line
+        If the tile is a beam:
+            If the tile below the current is a:
+            Empty space:
+                Set tile below to a beam of the same strenght as the current
+            Beam:
+                Add the current beam strenght to the existing beam strenght
+            Splitter:
+                Add beams with the same strenght as the current to the two tiles
+                  next to the splitter
+
+iterate through the last line of the grid adding the beam strenghts together
+and return the result
+
+
+
+Rust allows the use of Enums with values, so I use that instead of the hashmap
+approach, but the logic behind it is the same. Just instead of storing the
+strength in the hashmap I store it in the Beam type of tiles.
+
 
 
 */
@@ -102,38 +152,72 @@ fn calculate_part_one(data_path: &str) -> Result<u64, Box<dyn Error>> {
     Ok(splits)
 }
 
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+enum Tile {
+    Beam(u64),
+    Empty,
+    Splitter,
+}
+
+impl Tile {
+    /// If the tile this is called on is of type Beam or Empty a Beam type will be returned with
+    /// the strength provided + any potential old strength of an existing beam.
+    /// If the tile is a Splitter then a splitter is returned.
+    fn add_beam_strenght(&self, strength: u64) -> Tile {
+        match self {
+            Tile::Empty => Tile::Beam(strength),
+            Tile::Beam(current_strength) => Tile::Beam(current_strength + strength),
+            Tile::Splitter => Tile::Splitter,
+        }
+    }
+
+    fn parse(c: &char) -> Result<Tile, Box<dyn Error>> {
+        match c {
+            'S' => Ok(Tile::Beam(1)),
+            '.' => Ok(Tile::Empty),
+            '^' => Ok(Tile::Splitter),
+            _ => Err("Invalid character in data file!".into()),
+        }
+    }
+}
+
 fn calculate_part_two(data_path: &str) -> Result<u64, Box<dyn Error>> {
-    let grid: Vec<Vec<char>> = reader::get_lines(data_path)?
-        .map(|line| line.chars().collect())
-        .collect();
+    let mut grid: Vec<Vec<Tile>> = Vec::new();
+    for line in reader::get_lines(data_path)? {
+        let mut row = Vec::new();
+        for c in line.chars() {
+            row.push(Tile::parse(&c)?);
+        }
+        grid.push(row);
+    }
 
     if grid.iter().any(|line| line.len() != grid[0].len()) {
         return Err("The data lines does not have the same lenth!".into());
     }
 
-    let (mut beams, mut timelines): (VecDeque<(usize, usize)>, u64) = (VecDeque::new(), 0);
-    for (x, c) in grid[0].iter().enumerate() {
-        if *c == 'S' {
-            beams.push_back((x, 0));
-        }
-    }
-
-    while let Some((x, y)) = beams.pop_front() {
-        if y + 1 >= grid.len() {
-            timelines += 1;
-            continue;
-        }
-        match grid[y + 1][x] {
-            '.' => beams.push_back((x, y + 1)),
-            '^' => {
-                beams.push_back((x - 1, y + 1));
-                beams.push_back((x + 1, y + 1));
+    for y in 0..grid.len() - 1 {
+        for x in 0..grid[0].len() {
+            if let Tile::Beam(strength) = grid[y][x] {
+                match grid[y + 1][x] {
+                    Tile::Beam(_) | Tile::Empty => {
+                        grid[y + 1][x] = grid[y + 1][x].add_beam_strenght(strength)
+                    }
+                    Tile::Splitter => {
+                        grid[y + 1][x - 1] = grid[y + 1][x - 1].add_beam_strenght(strength);
+                        grid[y + 1][x + 1] = grid[y + 1][x + 1].add_beam_strenght(strength);
+                    }
+                }
             }
-            _ => return Err("Invalid character in grid!".into()),
         }
     }
 
-    Ok(timelines)
+    let mut c = 0;
+    for tile in grid[grid.len() - 1].iter() {
+        if let Tile::Beam(strength) = tile {
+            c += strength;
+        }
+    }
+    Ok(c)
 }
 
 fn main() {
