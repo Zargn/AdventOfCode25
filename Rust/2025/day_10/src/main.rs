@@ -167,6 +167,12 @@ We would need to add some extra logic to the loop as well. With the lights a 0 c
 and 1 a 0. Meaning it could "reverse". The joltage levels can only increase, so we will want to
 add a check to discard any path that leads to any joltage level above the desired one. As that
 will never be the correct path.
+
+Update:
+The initial idea wont work, at least in any reasonable amount of time.
+Some other approach is needed.
+I was thinking pathfinding might be the key if used with a heuristic, but I think that too would
+run into issues with the extreme amount of possible paths.
 */
 mod part_two {
     use crate::reader;
@@ -176,71 +182,84 @@ mod part_two {
     };
 
     #[derive(Default, PartialEq, Eq, Debug, Hash, Clone, Copy)]
-    struct Lights {
-        lights: [bool; 10],
+    struct Joltage {
+        lights: [u16; 10],
     }
 
-    impl Lights {
-        fn from_light_pattern(data: &str) -> Result<Lights, Box<dyn Error>> {
+    impl Joltage {
+        fn from_joltage_pattern(data: &str) -> Result<Joltage, Box<dyn Error>> {
             let trimmed_data = &data[1..data.len() - 1];
-            let mut new_lights = Lights::default();
-            for (i, char) in trimmed_data.chars().enumerate() {
-                new_lights.lights[i] = match char {
-                    '#' => true,
-                    '.' => false,
-                    _ => return Err("Unexpected character in light pattern!".into()),
-                };
+            let mut new_lights = Joltage::default();
+            for (i, data) in trimmed_data.split(',').enumerate() {
+                new_lights.lights[i] = data.parse()?;
             }
+
             Ok(new_lights)
         }
 
-        fn from_button(data: &&str) -> Result<Lights, Box<dyn Error>> {
+        fn from_button(data: &&str) -> Result<Joltage, Box<dyn Error>> {
             let trimmed_data = data[1..data.len() - 1].split(',');
-            let mut new_lights = Lights::default();
+            let mut new_lights = Joltage::default();
             for i in trimmed_data {
-                new_lights.lights[i.parse::<usize>()?] = true;
+                new_lights.lights[i.parse::<usize>()?] = 1;
             }
 
             Ok(new_lights)
         }
 
-        fn combine(&self, other: &Lights) -> Lights {
-            let mut new_lights = Lights::default();
+        fn combine(&self, other: &Joltage) -> Joltage {
+            let mut new_lights = Joltage::default();
             for i in 0..10 {
-                new_lights.lights[i] = self.lights[i] ^ other.lights[i];
+                new_lights.lights[i] = self.lights[i] + other.lights[i];
             }
             new_lights
+        }
+
+        fn can_reach(&self, other: &Joltage) -> bool {
+            for i in 0..self.lights.len() {
+                if self.lights[i] > other.lights[i] {
+                    return false;
+                }
+            }
+            true
         }
     }
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
         let mut total_steps = 0;
 
-        for line in reader::get_lines(data_path)? {
+        for (line_nr, line) in reader::get_lines(data_path)?.enumerate() {
             let parts = line.split(' ').collect::<Vec<&str>>();
             let (mut pattern_lookup, mut parts_iter) = (HashSet::new(), parts.iter());
-            let mut processing_queue = VecDeque::from(vec![(Lights::default(), 0)]);
+            let mut processing_queue = VecDeque::from(vec![(Joltage::default(), 0)]);
             let button_count = parts_iter.len() - 2; // -1 for first and -1 for last elements.
 
-            let desired_pattern =
-                Lights::from_light_pattern(parts_iter.next().expect("This should never be None"))?;
+            parts_iter.next();
+            let mut buttons = Vec::new();
+            for _ in 0..button_count {
+                buttons.push(Joltage::from_button(
+                    parts_iter.next().expect("This should never fail since we ensure to only call next the correct amount of times."),
+                )?);
+            }
 
-            let buttons = parts_iter
-                .take(button_count)
-                .map(Lights::from_button)
-                .collect::<Result<Vec<_>, _>>()?;
+            let desired_pattern = Joltage::from_joltage_pattern(
+                parts_iter.next().expect("This should never fail since we ensure to only call next the correct amount of times."),
+            )?;
 
             'outer: while let Some((lights, steps)) = processing_queue.pop_front() {
                 for new_lights in buttons.iter().map(|b| lights.combine(b)) {
-                    if pattern_lookup.insert(new_lights) {
+                    if pattern_lookup.insert(new_lights) && new_lights.can_reach(&desired_pattern) {
                         if new_lights == desired_pattern {
                             total_steps += 1 + steps;
                             break 'outer;
                         }
+                        println!("Light: {new_lights:?}");
                         processing_queue.push_back((new_lights, steps + 1));
                     }
                 }
             }
+
+            println!("Completed line {line_nr}");
         }
 
         Ok(total_steps)
