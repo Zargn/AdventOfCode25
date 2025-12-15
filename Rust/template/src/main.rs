@@ -61,16 +61,14 @@ mod part_two {
 // ###############################################################################################
 
 fn main() {
-    println!("Running Program...");
-    print!("\nPart One ");
+    print!("Running Program...\n\nPart One ");
     match part_one::calculate("data.txt") {
         Ok(value) => println!("Result:\n{}", value),
         Err(err) => println!("FAILED with error:\n{}", err),
     }
     print!("\nPart Two ");
     match part_two::calculate("data.txt") {
-        Ok(value) => println!("Result:\n{}", value),
-        Err(err) => println!("FAILED with error:\n{}", err),
+        Ok(value) => println!("Result:\n{}\n", value),
+        Err(err) => println!("FAILED with error:\n{}\n", err),
     }
-    println!();
 }
