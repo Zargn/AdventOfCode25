@@ -9,7 +9,7 @@ pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 7;
 pub const PART_ONE_EXPECTED_VALUE: u64 = 505;
 
 #[allow(dead_code)]
-pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 0;
+pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 33;
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_VALUE: u64 = 0;
 
@@ -154,15 +154,96 @@ mod part_one {
 Part Two
 ##################################################################################################
 
+This time we wont use the light pattern at the start of the data line, and instead use the joltage
+levels at the end of the line.
+THe buttons increase the listed joltage level by one. Button (1,3) would increase joltage at index
+1 by 1, and index 3 by 1.
+
+Thanks to the improvements made to Part One I think that code will be quite compatible with this
+new problem. The main thing we would need to change is to replace the Lights struct with a Joltage
+struct.
+
+We would need to add some extra logic to the loop as well. With the lights a 0 could become a 1,
+and 1 a 0. Meaning it could "reverse". The joltage levels can only increase, so we will want to
+add a check to discard any path that leads to any joltage level above the desired one. As that
+will never be the correct path.
 */
 mod part_two {
     use crate::reader;
-    use std::error::Error;
+    use std::{
+        collections::{HashSet, VecDeque},
+        error::Error,
+    };
+
+    #[derive(Default, PartialEq, Eq, Debug, Hash, Clone, Copy)]
+    struct Lights {
+        lights: [bool; 10],
+    }
+
+    impl Lights {
+        fn from_light_pattern(data: &str) -> Result<Lights, Box<dyn Error>> {
+            let trimmed_data = &data[1..data.len() - 1];
+            let mut new_lights = Lights::default();
+            for (i, char) in trimmed_data.chars().enumerate() {
+                new_lights.lights[i] = match char {
+                    '#' => true,
+                    '.' => false,
+                    _ => return Err("Unexpected character in light pattern!".into()),
+                };
+            }
+            Ok(new_lights)
+        }
+
+        fn from_button(data: &&str) -> Result<Lights, Box<dyn Error>> {
+            let trimmed_data = data[1..data.len() - 1].split(',');
+            let mut new_lights = Lights::default();
+            for i in trimmed_data {
+                new_lights.lights[i.parse::<usize>()?] = true;
+            }
+
+            Ok(new_lights)
+        }
+
+        fn combine(&self, other: &Lights) -> Lights {
+            let mut new_lights = Lights::default();
+            for i in 0..10 {
+                new_lights.lights[i] = self.lights[i] ^ other.lights[i];
+            }
+            new_lights
+        }
+    }
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-        let lines = reader::get_lines(data_path)?;
+        let mut total_steps = 0;
 
-        Err("NotImplemented: This problem has not been solved yet!".into())
+        for line in reader::get_lines(data_path)? {
+            let parts = line.split(' ').collect::<Vec<&str>>();
+            let (mut pattern_lookup, mut parts_iter) = (HashSet::new(), parts.iter());
+            let mut processing_queue = VecDeque::from(vec![(Lights::default(), 0)]);
+            let button_count = parts_iter.len() - 2; // -1 for first and -1 for last elements.
+
+            let desired_pattern =
+                Lights::from_light_pattern(parts_iter.next().expect("This should never be None"))?;
+
+            let buttons = parts_iter
+                .take(button_count)
+                .map(Lights::from_button)
+                .collect::<Result<Vec<_>, _>>()?;
+
+            'outer: while let Some((lights, steps)) = processing_queue.pop_front() {
+                for new_lights in buttons.iter().map(|b| lights.combine(b)) {
+                    if pattern_lookup.insert(new_lights) {
+                        if new_lights == desired_pattern {
+                            total_steps += 1 + steps;
+                            break 'outer;
+                        }
+                        processing_queue.push_back((new_lights, steps + 1));
+                    }
+                }
+            }
+        }
+
+        Ok(total_steps)
     }
 }
 
