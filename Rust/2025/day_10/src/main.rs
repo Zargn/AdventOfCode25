@@ -185,13 +185,57 @@ force it.
 
 This version is at least capable of solving the first line rather quickly, but then gets stuck
 on the second.
+
+Experiments...
+[.##.] (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}
+c1 [3] needs b5 + b6 to be exactly 3
+c2 [5] needs b2 + b6 to be exactly 5
+c3 [4] needs b3 + b4 + b5 to be exactly 4
+c4 [7] needs b1 + b2 + b4 to be exactly 7
+
+b1 can be anything between: 0..7
+b2 can be anything between: 0..5
+b3 can be anything between: 0..4
+b4 can be anything between: 0..4
+b5 can be anything between: 0..3
+b6 can be anything between: 0..3
+
+c1 [3] b5 = 3, b6 = 3
+c2 [5]
+c3 [4]
+c4 [7]
+
+c1 = 0 - b5(3) - b6(0)
+c2 = 5 - b6(0) = b2 + b6 - b6 = 5 = b2
+c3 = 4 - b5(3) = b3 + b4 + b5(3) - b5(3) = 1 = b3 + b4
+c4 = 7 = b1 + b2 + b3
+
+c1 [3]
+c2 [5]
+c3 [4]
+c4 [7]
+
+
+b1 can be anything between: (7 - b2 - b4)..7
+b2 can be anything between: (5 - b6 || 7 - b1 - b4)..5
+b3 can be anything between: 0..4
+b4 can be anything between: 0..4
+b5 can be anything between: 0..3
+b6 can be anything between: 0..3
+
+[#.#..#.##] (0,1,2,5,6,7,8) (1,4,6,7,8) (0,5,7) (0,1,2,6,7) (0,1,2,3,5,7,8) (0,1,5,7) (0,1,3,7,8) {138,150,10,13,17,127,25,155,38}
+
+
+The answer can never be lower than the highest joltage level.
 */
 mod part_two {
     use crate::reader;
     use std::{
-        cmp::Ordering,
+        cmp::{Ordering, Reverse},
         collections::{BinaryHeap, HashSet, VecDeque},
         error::Error,
+        thread,
+        time::{Duration, Instant},
     };
 
     #[derive(Default, PartialEq, Eq, Debug, Hash, Clone, Copy)]
@@ -202,14 +246,15 @@ mod part_two {
     #[derive(Clone, Copy, Default)]
     struct QueueGroup {
         jolatage: Joltage,
-        heuristic: i64,
+        cost: u16,
         steps: u64,
+        joltage_increases: u16,
     }
 
     impl Ord for QueueGroup {
         fn cmp(&self, other: &Self) -> Ordering {
-            //(self.heuristic).cmp(&(other.heuristic))
-            (other.heuristic).cmp(&(self.heuristic))
+            (self.cost).cmp(&(other.cost))
+            //(other.heuristic).cmp(&(self.heuristic))
         }
     }
 
@@ -221,7 +266,7 @@ mod part_two {
 
     impl PartialEq for QueueGroup {
         fn eq(&self, other: &Self) -> bool {
-            self.heuristic == other.heuristic
+            self.jolatage == other.jolatage
         }
     }
 
@@ -267,26 +312,40 @@ mod part_two {
 
         fn difference(&self, other: &Joltage) -> u64 {
             let mut diff = 0;
-            for i in 0..self.lights.len() {
-                diff += (self.lights[i] - other.lights[i]) as u64;
+            for i in 0..10 {
+                diff += ((self.lights[i] - other.lights[i]) as u64);
+                //println!("{} - {} = {}", self.lights[i], other.lights[i], diff);
             }
             diff
+        }
+
+        fn heuristic(&self, target: &Joltage) -> u16 {
+            let mut furthers_from_goal = 0;
+            for i in 0..self.lights.len() {
+                let diff = target.lights[i] - self.lights[i];
+                if diff > furthers_from_goal {
+                    furthers_from_goal = diff;
+                }
+            }
+            furthers_from_goal
         }
     }
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
         let mut total_steps = 0;
+        let mut c = 0;
 
         for (line_nr, line) in reader::get_lines(data_path)?.enumerate() {
+            let start_time = Instant::now();
             let parts = line.split(' ').collect::<Vec<&str>>();
             let (mut pattern_lookup, mut parts_iter) = (HashSet::new(), parts.iter());
             let mut processing_queue = VecDeque::from(vec![(Joltage::default(), 0)]);
-            let button_count = parts_iter.len() - 2; // -1 for first and -1 for last elements.
+            let block_count = parts_iter.len() - 2; // -1 for first and -1 for last elements.
 
             parts_iter.next();
-            let mut buttons = Vec::new();
-            for _ in 0..button_count {
-                buttons.push(Joltage::from_button(
+            let mut blocks = Vec::new();
+            for _ in 0..block_count {
+                blocks.push(Joltage::from_button(
                     parts_iter.next().expect("This should never fail since we ensure to only call next the correct amount of times."),
                 )?);
             }
@@ -294,26 +353,62 @@ mod part_two {
             let desired_pattern = Joltage::from_joltage_pattern(
                 parts_iter.next().expect("This should never fail since we ensure to only call next the correct amount of times."),
             )?;
+            //let desired_joltage_sum = desired_pattern.lights.iter().sum();
 
             let mut queue = BinaryHeap::new();
-            queue.push(QueueGroup::default());
+            queue.push(Reverse(QueueGroup::default()));
 
             'outer: while let Some(group) = queue.pop() {
-                for new_lights in buttons.iter().map(|b| group.jolatage.combine(b)) {
+                for new_lights in blocks.iter().map(|b| group.0.jolatage.combine(b)) {
                     if pattern_lookup.insert(new_lights) && new_lights.can_reach(&desired_pattern) {
+                        c += 1;
                         if new_lights == desired_pattern {
-                            total_steps += 1 + group.steps;
+                            total_steps += 1 + group.0.steps;
+                            //return Ok(total_steps);
                             break 'outer;
                         }
 
                         //println!("Light: {new_lights:?}");
-                        queue.push(QueueGroup {
+                        let joltage_sum = new_lights.lights.iter().sum(); /*
+                                                                          let heuristic = new_lights.heuristic(&desired_pattern)
+                                                                              + (group.0.steps as u16 / 2)
+                                                                              + 1
+                                                                              + (desired_pattern.difference(&new_lights) as u16 / 1); // */
+
+                        let heuristic =
+                            desired_pattern.difference(&new_lights) as u16 + group.0.steps as u16;
+                        let cost = joltage_sum + heuristic;
+
+                        println!(
+                            "estimated remaining cost: {}, current cost: {}, steps: {}, sum: {}",
+                            heuristic,
+                            joltage_sum as u64 + group.0.steps,
+                            group.0.steps,
+                            joltage_sum
+                        ); // */
+                           //println!("{:?}", new_lights);
+
+                        thread::sleep(Duration::from_millis(10));
+
+                        queue.push(Reverse(QueueGroup {
                             jolatage: new_lights,
-                            heuristic: desired_pattern.difference(&new_lights) as i64
-                                - group.steps as i64
-                                + 1,
-                            steps: group.steps + 1,
-                        });
+                            cost,
+                            steps: group.0.steps + 1,
+                            joltage_increases: joltage_sum,
+                        })); // */
+
+                    /*
+                    queue.push(QueueGroup {
+                        jolatage: new_lights,
+                        heuristic: heuristic(
+                            &new_lights.lights,
+                            &desired_pattern.lights,
+                            &blocks,
+                        ),
+                        steps: group.steps + 1,
+                    }); // */
+                    } else {
+                        println!("Skipped {:?}", new_lights);
                     }
                 }
             }
@@ -333,7 +428,12 @@ mod part_two {
                 }
             }*/
 
-            println!("Completed line {line_nr}");
+            println!("Completed line {}. Total Steps: {}", line_nr, total_steps);
+            println!(
+                "In {:?} time having searched {} combinations.",
+                Instant::now() - start_time,
+                c
+            );
         }
 
         Ok(total_steps)
