@@ -275,19 +275,15 @@ mod part_two {
         }
 
         fn combine(&self, other: &Joltage) -> Joltage {
-            let mut new_lights = Joltage::default();
-            for i in 0..10 {
-                new_lights.counters[i] = self.counters[i] + other.counters[i];
+            Joltage {
+                counters: std::array::from_fn(|i| self.counters[i] + other.counters[i]),
             }
-            new_lights
         }
 
         fn subtract_and_divide(&self, other: &Joltage) -> Joltage {
-            let mut new = Joltage::default();
-            for i in 0..10 {
-                new.counters[i] = (self.counters[i] - other.counters[i]) / 2;
+            Joltage {
+                counters: std::array::from_fn(|i| (self.counters[i] - other.counters[i]) / 2),
             }
-            new
         }
     }
 
@@ -336,18 +332,11 @@ mod part_two {
         }
         let mut answer = 1000000;
         for (pattern, pattern_cost) in pattern_costs.iter() {
-            if zip(pattern.counters, desired_pattern.counters)
-                .map(|t| {
-                    let (i, j) = (t.0, t.1);
-                    if i <= j && i % 2 == j % 2 {
-                        0
-                    } else {
-                        1
-                    }
-                })
+            let valid = zip(pattern.counters, desired_pattern.counters)
+                .map(|(i, j)| ((i > j) as u16) | ((i ^ j) & 1))
                 .sum::<u16>()
-                == 0
-            {
+                == 0;
+            if valid {
                 let new_goal = desired_pattern.subtract_and_divide(pattern);
                 answer = answer
                     .min(*pattern_cost as u64 + (2 * solve_single_aux(pattern_costs, new_goal)));
@@ -356,21 +345,16 @@ mod part_two {
         answer
     }
 
-    fn solve_single(blocks: Vec<Joltage>, desired_pattern: Joltage) -> u64 {
-        let pattern_costs = patterns(blocks);
-        solve_single_aux(&pattern_costs, desired_pattern)
-    }
-
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
         let mut total_steps = 0;
 
         for line in reader::get_lines(data_path)? {
             let start_time = Instant::now();
-            let parts = line.split(' ').collect::<Vec<&str>>();
-            let mut parts_iter = parts.iter();
-            let block_count = parts_iter.len() - 2; // -1 for first and -1 for last elements.
 
-            parts_iter.next();
+            let parts = line.split(' ').collect::<Vec<&str>>();
+            let mut parts_iter = parts.iter().skip(1); // Skip first element.
+            let block_count = parts_iter.len() - 1; // -1 for last elements.
+
             let mut blocks = Vec::new();
             for _ in 0..block_count {
                 blocks.push(Joltage::from_button(
@@ -382,8 +366,9 @@ mod part_two {
                 parts_iter.next().expect("This should never fail since we ensure to only call next the correct amount of times."),
             )?;
 
-            let subanswer = solve_single(blocks, desired_pattern);
+            let subanswer = solve_single_aux(&patterns(blocks), desired_pattern);
             total_steps += subanswer;
+
             println!("Completed line, steps: {}", subanswer);
             println!("In {:?} time", Instant::now() - start_time,);
         }
