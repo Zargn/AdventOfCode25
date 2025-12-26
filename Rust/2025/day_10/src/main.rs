@@ -11,7 +11,7 @@ pub const PART_ONE_EXPECTED_VALUE: u64 = 505;
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 33;
 #[allow(dead_code)]
-pub const PART_TWO_EXPECTED_VALUE: u64 = 0;
+pub const PART_TWO_EXPECTED_VALUE: u64 = 20002;
 
 //
 
@@ -227,15 +227,24 @@ b6 can be anything between: 0..3
 
 
 The answer can never be lower than the highest joltage level.
+
+Having 4 counters, where the desired value combination is 3,5,4,7 but all starting at 0.
+Then we have 6 blocks that increase the counters at the listed indexes by one with indexes ranging from 0 to 3.
+The blocks are:
+(3) (1,3) (2) (2,3) (0,2) (0, 1)
+
+How many blocks needs to be used to get the desired counter values?
 */
 mod part_two {
     use crate::reader;
     use std::{
         cmp::{Ordering, Reverse},
-        collections::{BinaryHeap, HashSet, VecDeque},
+        collections::{BinaryHeap, HashMap, HashSet, VecDeque},
         error::Error,
+        iter::zip,
         thread,
         time::{Duration, Instant},
+        u16,
     };
 
     #[derive(Default, PartialEq, Eq, Debug, Hash, Clone, Copy)]
@@ -301,6 +310,14 @@ mod part_two {
             new_lights
         }
 
+        fn subtract_and_divide(&self, other: &Joltage) -> Joltage {
+            let mut new = Joltage::default();
+            for i in 0..10 {
+                new.lights[i] = (self.lights[i] - other.lights[i]) / 2;
+            }
+            new
+        }
+
         fn can_reach(&self, other: &Joltage) -> bool {
             for i in 0..self.lights.len() {
                 if self.lights[i] > other.lights[i] {
@@ -331,9 +348,244 @@ mod part_two {
         }
     }
 
+    /*
+
+
+    from functools import cache
+    from itertools import combinations
+    import aocd
+
+    def patterns(coeffs: list[tuple[int, ...]]) -> dict[tuple[int, ...], int]:
+        out = {}
+        num_buttons = len(coeffs)
+        num_variables = len(coeffs[0])
+        for pattern_len in range(num_buttons+1):
+            for buttons in combinations(range(num_buttons), pattern_len):
+                pattern = tuple(map(sum, zip((0,) * num_variables, *(coeffs[i] for i in buttons))))
+                if pattern not in out:
+                    out[pattern] = pattern_len
+        return out
+
+    def solve_single(coeffs: list[tuple[int, ...]], goal: tuple[int, ...]) -> int:
+        pattern_costs = patterns(coeffs)
+        @cache
+        def solve_single_aux(goal: tuple[int, ...]) -> int:
+            if all(i == 0 for i in goal): return 0
+            answer = 1000000
+            for pattern, pattern_cost in pattern_costs.items():
+                if all(i <= j and i % 2 == j % 2 for i, j in zip(pattern, goal)):
+                    new_goal = tuple((j - i)//2 for i, j in zip(pattern, goal))
+                    answer = min(answer, pattern_cost + 2 * solve_single_aux(new_goal))
+            return answer
+        return solve_single_aux(goal)
+
+    def solve(raw: str):
+        answer = 0
+        lines = raw.splitlines()
+        for I, L in enumerate(lines, 1):
+            _, *coeffs, goal = L.split()
+            goal = tuple(int(i) for i in goal[1:-1].split(","))
+            coeffs = [[int(i) for i in r[1:-1].split(",")] for r in coeffs]
+            coeffs = [tuple(int(i in r) for i in range(len(goal))) for r in coeffs]
+
+            subanswer = solve_single(coeffs, goal)
+            print(f'Line {I}/{len(lines)}: answer {subanswer}')
+            answer += subanswer
+        print(answer)
+
+    solve(open('input/10.test').read())
+    solve(aocd.get_data(year=2025, day=10))
+
+
+
+
+    def combinations(iterable, r):
+
+    # combinations('ABCD', 2) → AB AC AD BC BD CD
+    # combinations(range(4), 3) → 012 013 023 123
+
+    pool = tuple(iterable)
+    n = len(pool)
+    if r > n:
+        return
+    indices = list(range(r))
+
+    yield tuple(pool[i] for i in indices)
+    while True:
+        for i in reversed(range(r)):
+            if indices[i] != i + n - r:
+                break
+        else:
+            return
+        indices[i] += 1
+        for j in range(i+1, r):
+            indices[j] = indices[j-1] + 1
+        yield tuple(pool[i] for i in indices)
+
+    */
+    fn combinations<T: Clone>(v: &[T], k: usize) -> Vec<Vec<T>> {
+        if k == 0 {
+            return vec![vec![]];
+        }
+        if v.len() < k {
+            return vec![];
+        }
+
+        let mut result = Vec::new();
+
+        for i in 0..=v.len() - k {
+            let head = v[i].clone();
+            for mut tail in combinations(&v[i + 1..], k - 1) {
+                let mut combo = vec![head.clone()];
+                combo.append(&mut tail);
+                result.push(combo);
+            }
+        }
+
+        result
+    }
+
+    fn patterns(blocks: Vec<Joltage>) -> HashMap<Joltage, u16> {
+        let blocks_count = blocks.len();
+        let mut out = HashMap::new();
+
+        for pattern_len in 0..blocks_count + 1 {
+            // (0..3).flat_map(|i| (0..4).map(move |j| (i, j)))
+            for buttons in combinations(&blocks, pattern_len) {
+                //for buttons in (0..blocks_count).map(|i| (blocks.iter().skip(i).take(pattern_len))) {
+                let mut pattern = Joltage::default();
+                //println!("pl: {}, {:?}\n", pattern_len, button);
+                //println!("pattern_len: {}\n", pattern_len);
+                buttons.iter().for_each(|j| {
+                    //print!(" {:?} ", j);
+                    pattern = pattern.combine(j);
+                });
+                //println!("\n{:?}", pattern);
+                //let pattern = Joltage::default();
+                out.entry(pattern).or_insert(pattern_len as u16);
+
+                /*
+                if !out.contains_key(&pattern) {
+                    out.insert(pattern, pattern_len as u16);
+                } // */
+            }
+        }
+
+        //println!("\n\nOut:\n{:?}", out);
+        out
+    }
+
+    fn solve_single_aux(pattern_costs: &HashMap<Joltage, u16>, desired_pattern: Joltage) -> u64 {
+        if desired_pattern.lights.iter().sum::<u16>() == 0 {
+            return 0;
+        }
+        let mut answer = 1000000;
+        for (pattern, pattern_cost) in pattern_costs.iter() {
+            if zip(pattern.lights, desired_pattern.lights)
+                .map(|t| {
+                    let (i, j) = (t.0, t.1);
+                    //print!("| i: {}, j: {} ", i, j);
+                    if i <= j && i % 2 == j % 2 {
+                        0
+                    } else {
+                        1
+                    }
+                })
+                .sum::<u16>()
+                == 0
+            {
+                /*
+                println!(
+                    "Success: {:?} - {:?}",
+                    pattern.lights, desired_pattern.lights
+                ); */
+                let new_goal = desired_pattern.subtract_and_divide(pattern);
+                answer = answer
+                    .min(*pattern_cost as u64 + (2 * solve_single_aux(pattern_costs, new_goal)));
+            } else {
+                /*
+                println!(
+                    "Failed: {:?} - {:?}",
+                    pattern.lights, desired_pattern.lights
+                ); */
+            }
+        }
+        answer
+    }
+    /*
+        def solve_single(coeffs: list[tuple[int, ...]], goal: tuple[int, ...]) -> int:
+            pattern_costs = patterns(coeffs)
+            @cache
+            def solve_single_aux(goal: tuple[int, ...]) -> int:
+                if all(i == 0 for i in goal): return 0
+                answer = 1000000
+                for pattern, pattern_cost in pattern_costs.items():
+                    if all(i <= j and i % 2 == j % 2 for i, j in zip(pattern, goal)):
+                        new_goal = tuple((j - i)//2 for i, j in zip(pattern, goal))
+                        answer = min(answer, pattern_cost + 2 * solve_single_aux(new_goal))
+                return answer
+            return solve_single_aux(goal)
+    */
+    fn solve_single(blocks: Vec<Joltage>, desired_pattern: Joltage) -> u64 {
+        let pattern_costs = patterns(blocks);
+        solve_single_aux(&pattern_costs, desired_pattern)
+    }
+
+    fn solve(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        let mut total_steps = 0;
+
+        for line in reader::get_lines(data_path)? {
+            let start_time = Instant::now();
+            let parts = line.split(' ').collect::<Vec<&str>>();
+            let mut parts_iter = parts.iter();
+            let block_count = parts_iter.len() - 2; // -1 for first and -1 for last elements.
+
+            parts_iter.next();
+            let mut blocks = Vec::new();
+            for _ in 0..block_count {
+                blocks.push(Joltage::from_button(
+                    parts_iter.next().expect("This should never fail since we ensure to only call next the correct amount of times."),
+                )?);
+            }
+
+            let desired_pattern = Joltage::from_joltage_pattern(
+                parts_iter.next().expect("This should never fail since we ensure to only call next the correct amount of times."),
+            )?;
+
+            let subanswer = solve_single(blocks, desired_pattern);
+            //println!("Subanswer: {}", subanswer);
+            total_steps += subanswer;
+            println!("Completed line, steps: {}", subanswer);
+            println!("In {:?} time", Instant::now() - start_time,);
+        }
+        //println!("Total steps: {total_steps}");
+        Ok(total_steps)
+
+        /*
+
+            def solve(raw: str):
+                answer = 0
+                lines = raw.splitlines()
+                for I, L in enumerate(lines, 1):
+                    _, *coeffs, goal = L.split()
+                    goal = tuple(int(i) for i in goal[1:-1].split(","))
+                    coeffs = [[int(i) for i in r[1:-1].split(",")] for r in coeffs]
+                    coeffs = [tuple(int(i in r) for i in range(len(goal))) for r in coeffs]
+
+                    subanswer = solve_single(coeffs, goal)
+                    print(f'Line {I}/{len(lines)}: answer {subanswer}')
+                    answer += subanswer
+                print(answer)
+        */
+
+        //todo!();
+    }
+
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
         let mut total_steps = 0;
         let mut c = 0;
+
+        return solve(data_path);
 
         for (line_nr, line) in reader::get_lines(data_path)?.enumerate() {
             let start_time = Instant::now();
@@ -350,10 +602,17 @@ mod part_two {
                 )?);
             }
 
+            patterns(blocks.clone());
+            todo!();
+
             let desired_pattern = Joltage::from_joltage_pattern(
                 parts_iter.next().expect("This should never fail since we ensure to only call next the correct amount of times."),
             )?;
             //let desired_joltage_sum = desired_pattern.lights.iter().sum();
+
+            for i in 0..blocks.len() {
+                let counters = Joltage::default();
+            }
 
             let mut queue = BinaryHeap::new();
             queue.push(Reverse(QueueGroup::default()));
@@ -377,18 +636,24 @@ mod part_two {
 
                         let heuristic =
                             desired_pattern.difference(&new_lights) as u16 + group.0.steps as u16;
-                        let cost = joltage_sum + heuristic;
+                        // */
+                        let heuristic = desired_pattern.difference(&new_lights) as u16;
+                        let cost = joltage_sum + heuristic + new_lights.heuristic(&desired_pattern)
+                            + group.0.steps as u16 + 1
+                            /*
+                            + (heuristic as i16 - (group.0.steps as i16 + 1)).clamp(0, i16::MAX)
+                                as u16 */
+                                ;
+
+                        let cost = desired_pattern.difference(&new_lights) as u16;
 
                         println!(
                             "estimated remaining cost: {}, current cost: {}, steps: {}, sum: {}",
-                            heuristic,
-                            joltage_sum as u64 + group.0.steps,
-                            group.0.steps,
-                            joltage_sum
+                            heuristic, cost, group.0.steps, joltage_sum
                         ); // */
                            //println!("{:?}", new_lights);
 
-                        thread::sleep(Duration::from_millis(10));
+                        //thread::sleep(Duration::from_millis(10));
 
                         queue.push(Reverse(QueueGroup {
                             jolatage: new_lights,
@@ -408,7 +673,7 @@ mod part_two {
                         steps: group.steps + 1,
                     }); // */
                     } else {
-                        println!("Skipped {:?}", new_lights);
+                        //println!("Skipped {:?}", new_lights);
                     }
                 }
             }
