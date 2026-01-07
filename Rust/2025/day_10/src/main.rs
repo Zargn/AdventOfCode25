@@ -247,6 +247,11 @@ improve it myself as a exercise to compensate for not technically "solving" it m
 mod part_two {
     use crate::reader;
     use std::{array, collections::HashMap, error::Error, iter::zip, time::Instant};
+
+    // #[rustfmt::skip] Disables auto formatting for the connected method, making it possible to
+    // make it more compact. Although it should probably only ever be used in cases where very
+    // simple code would otherwise take a really large amount of space.
+    // For example each of the two macro_rules! below would otherwise take 5 rows each.
     #[rustfmt::skip] macro_rules! combination_end { () => { vec![vec![]]}; }
     #[rustfmt::skip] macro_rules! no_possible_combinations { () => { vec![]}; }
 
@@ -280,7 +285,7 @@ mod part_two {
             Ok(new_lights)
         }
 
-        fn combine(&mut self, rhs: &Joltage) {
+        fn add_values(&mut self, rhs: &Joltage) {
             self.values = array::from_fn(|i| self.values[i] + rhs.values[i])
         }
 
@@ -322,7 +327,7 @@ mod part_two {
         for pattern_len in 0..blocks.len() + 1 {
             for buttons in get_combinations(&blocks, pattern_len) {
                 let mut pattern = Joltage::default();
-                buttons.iter().for_each(|j| pattern.combine(j));
+                buttons.iter().for_each(|b| pattern.add_values(b));
 
                 patterns
                     .entry(pattern.lights())
