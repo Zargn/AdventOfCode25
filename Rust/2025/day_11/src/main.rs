@@ -216,10 +216,10 @@ If a we check a node and it has a path value, we return that value instead of co
 Results:
 160 is too low
 4643476320 is too low ??? What!? Quite understandable that the calculation took ages if there
-4643476320are more than 4643476320 paths...
+are more than 4643476320 paths...
 */
 mod part_two {
-    use crate::reader;
+    use crate::{reader, PART_ONE_EXPECTED_VALUE};
     use std::{
         collections::{HashMap, HashSet},
         error::Error,
@@ -249,7 +249,6 @@ mod part_two {
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
         let lines = reader::get_lines(data_path)?;
-        //let mut connections: HashMap<String, (Vec<String>, u64, bool, bool)> = HashMap::new();
         let mut devices: HashMap<DeviceId, (Vec<DeviceId>, Option<u64>)> = HashMap::new();
 
         for line in lines {
@@ -261,16 +260,24 @@ mod part_two {
             }
         }
 
-        //connections.entry("svr".to_string()).or_default().1 = 1;
-        //connections.entry("out".to_string()).or_default();
-
         let svr = DeviceId::new("svr")?;
         let dac = DeviceId::new("dac")?;
         let fft = DeviceId::new("fft")?;
         let out = DeviceId::new("out")?;
+
         println!(
-            "\nsvr: {:?}\ndac: {:?}\nfft: {:?}\nout: {:?}",
-            svr, dac, fft, out
+            "\nPart One task should return 615, we got: {}\n",
+            solver(
+                DeviceId::new("you")?,
+                out,
+                &mut HashSet::new(),
+                &mut devices.clone()
+            )?
+        );
+
+        assert_eq!(
+            PART_ONE_EXPECTED_VALUE,
+            count_paths(vec![DeviceId::new("you")?, out], &devices)?
         );
 
         let mut result = 0;
@@ -278,12 +285,11 @@ mod part_two {
         result += count_paths(vec![svr, dac, fft, out], &devices)?;
         result += count_paths(vec![svr, fft, dac, out], &devices)?;
 
-        // I don't think we need to add "out" since it should not point to any other id, meaning
-        // it should never be possible to need to check if it has been visited.
+        println!(
+            "Paths test: {}",
+            count_paths(vec![DeviceId::new("you")?, out], &devices)?
+        );
 
-        //solver("svr".to_string(), &mut path_trace, &mut connections, 0)?;
-
-        //Ok(connections.entry("out".to_string()).or_default().1)
         Ok(result)
     }
 
@@ -347,8 +353,6 @@ mod part_two {
             }
         }
 
-        //if result == 0 {
-        // No path to goal exist from here so mark it as a dead end.
         connections
             .get_mut(&current)
             .ok_or(format!(
@@ -356,104 +360,11 @@ mod part_two {
                 current
             ))?
             .1 = Some(result);
-        //}
 
         path_trace.remove(&current);
 
         Ok(result)
     }
-
-    /*
-    fn solver2(
-        current_id: String,
-        path_trace: &mut HashSet<String>,
-        connections: &mut HashMap<String, (Vec<String>, u64, bool, bool)>,
-        last_cost: u64,
-    ) -> Result<bool, Box<dyn Error>> {
-        let (connected_ids, _, _, dead_end) = connections
-            .get(&current_id)
-            .ok_or("E2: Current id does not exist in the connections hashmap!")?
-            .clone();
-
-        if dead_end {
-            return Ok(true);
-        }
-
-        let mut dead_end = true;
-
-        /*
-        for connected_id in connected_ids {
-            if (path_trace.insert(connected_id.to_string()) && current_id != "out")
-                && (connected_id != "out"
-                    || (connected_id == "out"
-                        && path_trace.contains("dac")
-                        && path_trace.contains("fft")))
-            {
-                let connected_old_cost = connections
-                    .get(&connected_id)
-                    .ok_or(format!(
-                        "E5: connected_id [{}] does not exist in the connections hashmap!",
-                        connected_id
-                    ))?
-                    .1;
-                if !visited {
-                    connections
-                        .get_mut(&connected_id)
-                        .ok_or(format!(
-                            "E3: connected_id [{}] does not exist in the connections hashmap!",
-                            connected_id
-                        ))?
-                        .1 += path_count;
-                } else {
-                    connections
-                        .get_mut(&connected_id)
-                        .ok_or(format!(
-                            "E4: connected_id [{}] does not exist in the connections hashmap!",
-                            connected_id
-                        ))?
-                        .1 += path_count - last_cost;
-                }
-
-                if solver(connected_id, path_trace, connections, connected_old_cost)? {
-                    dead_end = false;
-                }
-            }
-        }
-        connections
-            .get_mut(&current_id)
-            .ok_or("E6: current_id does not exist in the connections hashmap!")?
-            .2 = true;
-        */
-
-        for connected_id in connected_ids {
-            if connected_id == "out" {
-                if path_trace.contains("dac") && path_trace.contains("fft") {
-                    connections
-                        .get_mut("out")
-                        .ok_or("E3: out does not exist in the connections hashmap!")?
-                        .1 += 1;
-                    dead_end = false;
-                    println!("\nPath found!\n");
-                } else {
-                    print!("O");
-                }
-            } else if path_trace.insert(connected_id.clone()) {
-                if solver(connected_id, path_trace, connections, 0)? {
-                    dead_end = false;
-                }
-            }
-        }
-
-        if dead_end {
-            connections
-                .get_mut(&current_id)
-                .ok_or("E6: current_id does not exist in the connections hashmap!")?
-                .2 = true;
-        }
-
-        path_trace.remove(&current_id);
-        Ok(dead_end)
-    } */
 }
 
 //
