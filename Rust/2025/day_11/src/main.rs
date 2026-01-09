@@ -6,7 +6,7 @@ mod tests;
 #[allow(dead_code)]
 pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 5;
 #[allow(dead_code)]
-pub const PART_ONE_EXPECTED_VALUE: u64 = 0;
+pub const PART_ONE_EXPECTED_VALUE: u64 = 615;
 
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 0;
@@ -72,25 +72,26 @@ mod part_one {
             connections.entry(source.to_string()).or_default();
             for o in s.next().ok_or("")?.split(" ") {
                 connections
-                    .entry(o.to_string())
+                    .entry(source.to_string())
                     .or_default()
                     .0
-                    .push(source.to_string());
+                    .push(o.to_string());
             }
         }
 
-        connections.entry("out".to_string()).or_default().1 = 1;
+        connections.entry("you".to_string()).or_default().1 = 1;
+        connections.entry("out".to_string()).or_default();
 
         let mut path_trace: HashSet<String> = HashSet::new();
         // I don't think we need to add "out" since it should not point to any other id, meaning
         // it should never be possible to need to check if it has been visited.
 
         //println!("{connections:?}");
-        solver("out".to_string(), &mut path_trace, &mut connections, 0)?;
+        solver("you".to_string(), &mut path_trace, &mut connections, 0)?;
         println!("\n\n{connections:?}\n");
         //todo!();
 
-        Ok(connections.entry("you".to_string()).or_default().1)
+        Ok(connections.entry("out".to_string()).or_default().1)
     }
 
     fn solver(
@@ -110,7 +111,7 @@ mod part_one {
 
         let mut dead_end = true;
 
-        if current_id == "you" {
+        if current_id == "out" {
             println!("Reached you. Total paths: {path_count}");
             //return Ok(());
         }
@@ -122,10 +123,13 @@ mod part_one {
         }
 
         for connected_id in connected_ids {
-            if path_trace.insert(connected_id.to_string()) && current_id != "you" {
+            if path_trace.insert(connected_id.to_string()) && current_id != "out" {
                 let connected_old_cost = connections
                     .get(&connected_id)
-                    .ok_or("E5: connected_id does not exist in the connections hashmap!")?
+                    .ok_or(format!(
+                        "E5: connected_id [{}] does not exist in the connections hashmap!",
+                        connected_id
+                    ))?
                     .1;
                 if !visited {
                     connections
