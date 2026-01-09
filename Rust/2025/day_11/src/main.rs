@@ -9,7 +9,7 @@ pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 5;
 pub const PART_ONE_EXPECTED_VALUE: u64 = 615;
 
 #[allow(dead_code)]
-pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 0;
+pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 2;
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_VALUE: u64 = 0;
 
@@ -94,10 +94,7 @@ mod part_one {
         // I don't think we need to add "out" since it should not point to any other id, meaning
         // it should never be possible to need to check if it has been visited.
 
-        //println!("{connections:?}");
         solver("you".to_string(), &mut path_trace, &mut connections, 0)?;
-        println!("\n\n{connections:?}\n");
-        //todo!();
 
         Ok(connections.entry("out".to_string()).or_default().1)
     }
@@ -114,21 +111,10 @@ mod part_one {
             .clone();
 
         if dead_end {
-            return Ok(false);
+            //return Ok(false);
         }
 
         let mut dead_end = true;
-
-        if current_id == "out" {
-            println!("Reached you. Total paths: {path_count}");
-            //return Ok(());
-        }
-
-        if visited {
-            println!("{} has been visited before!", current_id);
-        } else {
-            println!("{} has not been visited before!", current_id);
-        }
 
         for connected_id in connected_ids {
             if path_trace.insert(connected_id.to_string()) && current_id != "out" {
@@ -191,15 +177,108 @@ My first thought is to use the dead end boolean. If a path is a dead end we shou
 path count until we reach a path that is valid. Basically, subtract the invalid path cost from
 the existing path cost.
 
+Edit:
+I just realised I probably overcomplicated both part one and two...
+I try to cache the path counts to decrease the amount of work needed, but I still iterate through
+every possible path. Meaning I might as well just not cache anything and instead add one to a
+counter each time "out" is reached... :/
 */
 mod part_two {
     use crate::reader;
-    use std::error::Error;
+    use std::{
+        collections::{HashMap, HashSet},
+        error::Error,
+    };
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
         let lines = reader::get_lines(data_path)?;
+        let mut connections: HashMap<String, (Vec<String>, u64, bool, bool)> = HashMap::new();
 
-        Err("NotImplemented: This problem has not been solved yet!".into())
+        for line in lines {
+            let mut s = line.split(": ");
+            let source = s.next().ok_or("E1: Invalid data format!")?;
+            connections.entry(source.to_string()).or_default();
+            for o in s.next().ok_or("")?.split(" ") {
+                connections
+                    .entry(source.to_string())
+                    .or_default()
+                    .0
+                    .push(o.to_string());
+            }
+        }
+
+        connections.entry("svr".to_string()).or_default().1 = 1;
+        connections.entry("out".to_string()).or_default();
+
+        let mut path_trace: HashSet<String> = HashSet::new();
+        // I don't think we need to add "out" since it should not point to any other id, meaning
+        // it should never be possible to need to check if it has been visited.
+
+        solver("svr".to_string(), &mut path_trace, &mut connections, 0)?;
+
+        Ok(connections.entry("out".to_string()).or_default().1)
+    }
+
+    fn solver(
+        current_id: String,
+        path_trace: &mut HashSet<String>,
+        connections: &mut HashMap<String, (Vec<String>, u64, bool, bool)>,
+        last_cost: u64,
+    ) -> Result<bool, Box<dyn Error>> {
+        let (connected_ids, path_count, visited, dead_end) = connections
+            .get(&current_id)
+            .ok_or("E2: Current id does not exist in the connections hashmap!")?
+            .clone();
+
+        if dead_end {
+            return Ok(false);
+        }
+
+        let mut dead_end = true;
+
+        for connected_id in connected_ids {
+            if (path_trace.insert(connected_id.to_string()) && current_id != "out")
+                && (connected_id != "out"
+                    || (connected_id == "out"
+                        && path_trace.contains("dac")
+                        && path_trace.contains("fft")))
+            {
+                let connected_old_cost = connections
+                    .get(&connected_id)
+                    .ok_or(format!(
+                        "E5: connected_id [{}] does not exist in the connections hashmap!",
+                        connected_id
+                    ))?
+                    .1;
+                if !visited {
+                    connections
+                        .get_mut(&connected_id)
+                        .ok_or(format!(
+                            "E3: connected_id [{}] does not exist in the connections hashmap!",
+                            connected_id
+                        ))?
+                        .1 += path_count;
+                } else {
+                    connections
+                        .get_mut(&connected_id)
+                        .ok_or(format!(
+                            "E4: connected_id [{}] does not exist in the connections hashmap!",
+                            connected_id
+                        ))?
+                        .1 += path_count - last_cost;
+                }
+
+                if solver(connected_id, path_trace, connections, connected_old_cost)? {
+                    dead_end = false;
+                }
+            }
+        }
+        connections
+            .get_mut(&current_id)
+            .ok_or("E6: current_id does not exist in the connections hashmap!")?
+            .2 = true;
+        path_trace.remove(&current_id);
+        Ok(dead_end)
     }
 }
 

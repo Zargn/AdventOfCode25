@@ -47,7 +47,7 @@ fn calculate_part_two_example() {
     let Some(expected_value) = test_configured(PART_TWO_EXPECTED_TEST_VALUE) else {
         return;
     };
-    match part_two::calculate("testdata.txt") {
+    match part_two::calculate("testdata_two.txt") {
             Ok(value) => assert_eq!(
                 value, expected_value,
                 "Part Two calculation completed successfully but the result was wrong! Expected: {} but received: {}",
