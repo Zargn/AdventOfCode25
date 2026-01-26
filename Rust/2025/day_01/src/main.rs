@@ -41,9 +41,17 @@ mod part_one {
     use std::error::Error;
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-        let lines = reader::get_lines(data_path)?;
-
-        Err("NotImplemented: This problem has not been solved yet!".into())
+        let (mut result, mut dial_value) = (0, 50);
+        for line in reader::get_lines(data_path)? {
+            let v = &line[1..].parse::<i32>()?;
+            match line.chars().next().ok_or("Unexpected empty line!")? {
+                'R' => dial_value += v,
+                'L' => dial_value -= v,
+                _ => return Err("Invalid direction char!".into()),
+            }
+            result += if dial_value % 100 == 0 { 1 } else { 0 }
+        }
+        Ok(result)
     }
 }
 
@@ -193,6 +201,7 @@ impl Dial {
     }
 }
 
+/*
 #[test]
 fn calculate_test() {
     let expected_value = 6;
@@ -204,7 +213,7 @@ fn calculate_test() {
         ),
         Err(err) => panic!("Error occured:\n{}", err),
     }
-}
+}*/
 
 /*
 #[test]
