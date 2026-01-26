@@ -11,7 +11,7 @@ pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 3;
 pub const PART_ONE_EXPECTED_VALUE: u64 = 1029;
 
 #[allow(dead_code)]
-pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 0;
+pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 6;
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_VALUE: u64 = 0;
 
@@ -79,9 +79,32 @@ mod part_two {
     use std::error::Error;
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-        let lines = reader::get_lines(data_path)?;
+        let (mut result, mut dial_value) = (0, 50i32);
+        let mut section = (1, 0);
+        for line in reader::get_lines(data_path)? {
+            println!("dial: {} rotate by: {}", dial_value, line,);
+            let v = &line[1..].parse::<u64>()?;
+            result += v / 100;
+            match line.chars().next().ok_or("Unexpected empty line!")? {
+                'R' => dial_value += *v as i32 % 100,
+                'L' => dial_value -= *v as i32 % 100,
+                _ => return Err("Invalid direction char!".into()),
+            }
+            let cv = dial_value / 100;
+            if dial_value % 100 == 0 {
+                result += 1;
+                section = (dial_value / 100, (dial_value / 100) - 1);
+            } else if i32::min((section.0 - cv).abs(), (section.1 - cv).abs()) != 0 {
+                result += 1;
+            } else {
+                section = (dial_value / 100, dial_value / 100);
+            }
 
-        Err("NotImplemented: This problem has not been solved yet!".into())
+            //result += (last_val - cv).unsigned_abs() as u64;
+            //last_val = cv;
+            println!("result: {}", result);
+        }
+        Ok(result)
     }
 }
 
