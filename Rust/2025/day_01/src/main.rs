@@ -79,26 +79,22 @@ mod part_two {
     use std::error::Error;
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-        let (mut result, mut dial_value) = (0, 50);
-        let mut at_zero = false;
+        let (mut result, mut dial_value, mut at_zero) = (0, 50, false);
         for line in reader::get_lines(data_path)? {
-            let v = &line[1..].parse::<u64>()?;
-            result += v / 100;
+            let rotation = &line[1..].parse::<u64>()?;
+            result += rotation / 100;
             match line.chars().next().ok_or("Unexpected empty line!")? {
-                'R' => dial_value += *v as i32 % 100,
-                'L' => dial_value -= *v as i32 % 100,
+                'R' => dial_value += *rotation as i32 % 100,
+                'L' => dial_value -= *rotation as i32 % 100,
                 _ => return Err("Invalid direction char!".into()),
             }
 
-            if (dial_value > 99 || dial_value < 1) && !at_zero {
+            if !(1..=99).contains(&dial_value) && !at_zero {
                 result += 1;
             }
 
-            if dial_value < 0 {
-                dial_value += 100;
-            }
-
-            dial_value %= 100;
+            // Produces the same result as +/- 100 to ensure it is within 0-99
+            dial_value = dial_value.rem_euclid(100);
 
             at_zero = dial_value == 0;
         }
