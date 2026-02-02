@@ -48,19 +48,6 @@ mod part_one {
 
         fn parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
             let mut parts = data_string.split('-');
-            let (Some(lower), Some(upper)) = (parts.next(), parts.next()) else {
-                return Err("Invalid Range Format".into());
-            };
-            Ok(IDRange {
-                upper: upper.parse()?,
-                lower: lower.parse()?,
-            })
-        }
-
-        /// Compressed version of parse().
-        /// Does the same thing but with less code.
-        fn compressed_parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
-            let mut parts = data_string.split('-');
             Ok(IDRange {
                 lower: parts.next().ok_or("Invalid Range Format")?.parse()?,
                 upper: parts.next().ok_or("Invalid Range Format")?.parse()?,
@@ -73,7 +60,7 @@ mod part_one {
         let mut ranges: Vec<IDRange> = Vec::new();
 
         for line in lines.iter().take_while(|line| !line.is_empty()) {
-            ranges.push(IDRange::compressed_parse(line)?);
+            ranges.push(IDRange::parse(line)?);
         }
 
         let mut fresh_ingredients: u64 = 0;
@@ -124,7 +111,6 @@ This should be enough to merge any overlapping ranges.
 
 Then count the total by looping through all ranges adding the following to the total
 range.upper - range.lower
-
 */
 mod part_two {
     use crate::reader;
@@ -137,94 +123,61 @@ mod part_two {
     }
 
     impl IDRange {
-        fn in_range(&self, value: &u64) -> bool {
-            self.lower <= *value && *value <= self.upper
-        }
-
-        fn attempt_merge(&mut self, other: &IDRange) -> bool {
-            if !((self.upper >= other.lower && self.lower <= other.lower)
-                || (self.upper >= other.upper && self.lower <= other.upper)
-                || (self.upper <= other.upper && self.lower >= other.lower))
-            {
-                return false;
-            }
-
-            let new_upper = if self.upper >= other.upper {
-                self.upper
-            } else {
-                other.upper
-            };
-            let new_lower = if self.lower <= other.lower {
-                self.lower
-            } else {
-                other.lower
-            };
-
-            self.upper = new_upper;
-            self.lower = new_lower;
-
-            true
-        }
-
-        fn range_count(&self) -> u64 {
-            self.upper - self.lower + 1 // Add 1 since the range is inclusive.
-        }
-
-        fn parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
-            let mut parts = data_string.split('-');
-            let (Some(lower), Some(upper)) = (parts.next(), parts.next()) else {
-                return Err("Invalid Range Format".into());
-            };
-            Ok(IDRange {
-                upper: upper.parse()?,
-                lower: lower.parse()?,
-            })
-        }
-
-        /// Compressed version of parse().
-        /// Does the same thing but with less code.
-        fn compressed_parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
+        pub fn parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
             let mut parts = data_string.split('-');
             Ok(IDRange {
                 lower: parts.next().ok_or("Invalid Range Format")?.parse()?,
                 upper: parts.next().ok_or("Invalid Range Format")?.parse()?,
             })
         }
+
+        pub fn attempt_merge(&self, other: &IDRange) -> Option<IDRange> {
+            if !self.overlaps_with(other) {
+                return None;
+            }
+
+            Some(IDRange {
+                upper: self.upper.max(other.upper),
+                lower: self.lower.min(other.lower),
+            })
+        }
+
+        fn overlaps_with(&self, other: &IDRange) -> bool {
+            self.lower <= other.upper && other.lower <= self.upper
+        }
+
+        pub fn size(&self) -> u64 {
+            self.upper - self.lower + 1 // Add 1 since the range is inclusive.
+        }
+    }
+
+    fn merge_ranges(ranges: &mut Vec<IDRange>) {
+        let mut origin_i = 0;
+        while origin_i < ranges.len() {
+            let mut search_i = origin_i + 1;
+            while search_i < ranges.len() {
+                if let Some(merged_range) = ranges[origin_i].attempt_merge(&ranges[search_i]) {
+                    ranges.swap_remove(search_i);
+                    ranges[origin_i] = merged_range;
+                    search_i = origin_i + 1;
+                } else {
+                    search_i += 1;
+                }
+            }
+            origin_i += 1;
+        }
     }
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-        let lines: Vec<String> = reader::get_lines(data_path)?.collect();
         let mut ranges: Vec<IDRange> = Vec::new();
 
-        for line in lines.iter().take_while(|line| !line.is_empty()) {
-            ranges.push(IDRange::compressed_parse(line)?);
+        for line in reader::get_lines(data_path)?.take_while(|line| !line.is_empty()) {
+            ranges.push(IDRange::parse(&line)?);
         }
 
-        let mut ranges_len = ranges.len();
-        let mut outer_index = 0;
-        while outer_index < ranges_len {
-            let mut range = ranges[outer_index];
-            let mut i = outer_index + 1;
-            while i < ranges_len {
-                let other_range = ranges[i];
-                if range.attempt_merge(&other_range) {
-                    ranges.remove(i);
-                    ranges[outer_index] = range;
-                    i = outer_index + 1;
-                    ranges_len -= 1;
-                } else {
-                    i += 1;
-                }
-            }
-            outer_index += 1;
-        }
+        merge_ranges(&mut ranges);
 
-        let mut count = 0;
-        for range in ranges {
-            count += range.range_count();
-        }
-
-        Ok(count)
+        Ok(ranges.iter().map(|range| range.size()).sum())
     }
 }
 
