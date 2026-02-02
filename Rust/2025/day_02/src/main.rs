@@ -1,11 +1,25 @@
-use std::error::Error;
-
-mod data_parser;
-mod operations;
 mod reader;
 
+#[cfg(test)]
+mod tests;
+
+#[allow(dead_code)]
+pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 1227775554;
+#[allow(dead_code)]
+pub const PART_ONE_EXPECTED_VALUE: u64 = 24747430309;
+
+#[allow(dead_code)]
+pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 4174379265;
+#[allow(dead_code)]
+pub const PART_TWO_EXPECTED_VALUE: u64 = 30962646823;
+
+//
+
+//
+
 /*
-Part One:
+Part One
+##################################################################################################
 
 First step here is to read the string and convert it to a sequnce of number pairs.
 Once that is done we can process each number in the range of the pair.
@@ -13,10 +27,73 @@ Once that is done we can process each number in the range of the pair.
 Processing could work like this:
 Convert the number into a string.
 Split the string in half. If both parts are the same then the ID is invalid.
+*/
+mod part_one {
+    use crate::reader;
+    use std::error::Error;
 
+    struct IDRange {
+        lower: u64,
+        upper: u64,
+    }
 
+    impl IDRange {
+        fn parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
+            let mut parts = data_string.split('-');
+            let lower = parts.next();
+            let upper = parts.next();
+            let (Some(lower), Some(upper)) = (lower, upper) else {
+                return Err(format!(
+                    "Could not parse IDRange from data string: [{}]!",
+                    data_string
+                )
+                .into());
+            };
+            Ok(IDRange {
+                lower: lower.parse()?,
+                upper: upper.parse()?,
+            })
+        }
 
-Part Two:
+        fn invalid_id_sum(&self) -> u64 {
+            let mut id_sum = 0;
+
+            for id in self.lower..=self.upper {
+                let id_string = id.to_string();
+                let id_len = id_string.chars().count();
+                if id_string[0..id_len / 2] == id_string[id_len / 2..] {
+                    id_sum += id;
+                }
+            }
+
+            id_sum
+        }
+    }
+
+    pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        // get_lines returns an iterator over the lines of the file. next() attempts to return the
+        // first line, which we then ensure is there with expect().
+        let line = reader::get_lines(data_path)?
+            .next()
+            .expect("The data files for this challenge always only contain 1 line.");
+
+        let mut id_sum = 0;
+        for data_string in line.split(',') {
+            let id_range = IDRange::parse(data_string)?;
+            id_sum += id_range.invalid_id_sum();
+        }
+
+        Ok(id_sum)
+    }
+}
+
+//
+
+//
+
+/*
+Part Two
+##################################################################################################
 
 Part two adds a quite annoying new requirement. Any id with a repeating pattern is invalid as long as it repeats at least once.
 The first glance solution I can think of is to check each combination, which will be very slow.
@@ -37,113 +114,100 @@ Check how similar the lower and upper values are left to right.
 This can be used to skip checking some patterns. With the second range with the shared first digits of 534 we can figure out that:
 - The 1 digit pattern is impossible due to the second digit [3] not matching the first [5].
 - The 2 digit pattern is impossible due to the third digit [4] not matching the first [5].
-
-
-
 */
+mod part_two {
+    use crate::reader;
+    use std::error::Error;
 
-struct IDRange {
-    lower: u64,
-    upper: u64,
-}
-
-impl IDRange {
-    fn parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
-        let mut parts = data_string.split('-');
-        let lower = parts.next();
-        let upper = parts.next();
-        let (Some(lower), Some(upper)) = (lower, upper) else {
-            return Err(format!(
-                "Could not parse IDRange from data string: [{}]!",
-                data_string
-            )
-            .into());
-        };
-        Ok(IDRange {
-            lower: lower.parse()?,
-            upper: upper.parse()?,
-        })
+    struct IDRange {
+        lower: u64,
+        upper: u64,
     }
 
-    fn invalid_id_sum(&self) -> u64 {
-        let mut id_sum = 0;
-
-        for id in self.lower..=self.upper {
-            let digit_count = id.ilog10() + 1;
-            if Self::is_invalid(&id.to_string(), digit_count as usize) {
-                id_sum += id;
-            }
+    impl IDRange {
+        fn parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
+            let mut parts = data_string.split('-');
+            let lower = parts.next();
+            let upper = parts.next();
+            let (Some(lower), Some(upper)) = (lower, upper) else {
+                return Err(format!(
+                    "Could not parse IDRange from data string: [{}]!",
+                    data_string
+                )
+                .into());
+            };
+            Ok(IDRange {
+                lower: lower.parse()?,
+                upper: upper.parse()?,
+            })
         }
 
-        id_sum
-    }
+        fn invalid_id_sum(&self) -> u64 {
+            let mut id_sum = 0;
 
-    fn is_invalid(id_string: &str, digit_count: usize) -> bool {
-        for pattern_len in 1..=digit_count / 2 {
-            let pattern = &id_string[0..pattern_len];
-            let mut i = pattern_len;
-            let mut invalid = true;
-            while i < digit_count {
-                if i + pattern_len > digit_count || pattern != &id_string[i..i + pattern_len] {
-                    invalid = false;
-                    break;
+            for id in self.lower..=self.upper {
+                let digit_count = id.ilog10() + 1;
+                if Self::is_invalid(&id.to_string(), digit_count as usize) {
+                    id_sum += id;
                 }
-                i += pattern_len;
             }
-            if invalid {
-                return true;
-            }
+
+            id_sum
         }
-        false
+
+        fn is_invalid(id_string: &str, digit_count: usize) -> bool {
+            for pattern_len in 1..=digit_count / 2 {
+                let pattern = &id_string[0..pattern_len];
+                let mut i = pattern_len;
+                let mut invalid = true;
+                while i < digit_count {
+                    if i + pattern_len > digit_count || pattern != &id_string[i..i + pattern_len] {
+                        invalid = false;
+                        break;
+                    }
+                    i += pattern_len;
+                }
+                if invalid {
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        // get_lines returns an iterator over the lines of the file. next() attempts to return the
+        // first line, which we then ensure is there with expect().
+        let line = reader::get_lines(data_path)?
+            .next()
+            .expect("The data files for this challenge always only contain 1 line.");
+
+        let mut id_sum = 0;
+        for data_string in line.split(',') {
+            let id_range = IDRange::parse(data_string)?;
+            id_sum += id_range.invalid_id_sum();
+        }
+
+        Ok(id_sum)
     }
 }
 
-fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-    // get_lines returns an iterator over the lines of the file. next() attempts to return the
-    // first line, which we then ensure is there with expect().
-    let line = reader::get_lines(data_path)?
-        .next()
-        .expect("The data files for this challenge always only contain 1 line.");
+//
 
-    let mut id_sum = 0;
-    for data_string in line.split(',') {
-        let id_range = IDRange::parse(data_string)?;
-        id_sum += id_range.invalid_id_sum();
-    }
+//
 
-    Ok(id_sum)
-}
+// Default controller code. Is the same between projects.
+// ###############################################################################################
 
 fn main() {
-    match calculate("data.txt") {
+    print!("Running Program...\n\nPart One ");
+    match part_one::calculate("data.txt") {
         Ok(value) => println!("Result:\n{}", value),
-        Err(err) => println!("Error occured:\n{}", err),
+        Err(err) => println!("FAILED with error:\n{}", err),
+    }
+    print!("\nPart Two ");
+    match part_two::calculate("data.txt") {
+        Ok(value) => println!("Result:\n{}\n", value),
+        Err(err) => println!("FAILED with error:\n{}\n", err),
     }
 }
-
-#[test]
-fn calculate_test() {
-    let expected_value = 4174379265;
-    match calculate("testdata.txt") {
-        Ok(value) => assert_eq!(
-            value, expected_value,
-            "Program using testdata.txt finished but result was wrong! Expected: {} but received: {}",
-            expected_value, value
-        ),
-        Err(err) => panic!("Error occured:\n{}", err),
-    }
-}
-
-/*
-#[test]
-fn calculate_small_test() {
-    let expected_value = 0;
-    match calculate("smalltestdata.txt") {
-        Ok(value) => assert_eq!(
-            value, expected_value,
-            "Program using smalltestdata.txt finished but result was wrong! Expected: {} but received: {}",
-            expected_value, value
-        ),
-        Err(err) => panic!("Error occured:\n{}", err),
-    }
-} // */
