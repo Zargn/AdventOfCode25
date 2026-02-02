@@ -40,9 +40,7 @@ mod part_one {
     impl IDRange {
         fn parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
             let mut parts = data_string.split('-');
-            let lower = parts.next();
-            let upper = parts.next();
-            let (Some(lower), Some(upper)) = (lower, upper) else {
+            let (Some(lower), Some(upper)) = (parts.next(), parts.next()) else {
                 return Err(format!(
                     "Could not parse IDRange from data string: [{}]!",
                     data_string
@@ -71,15 +69,16 @@ mod part_one {
     }
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        let mut id_sum = 0;
+
         // get_lines returns an iterator over the lines of the file. next() attempts to return the
         // first line, which we then ensure is there with expect().
-        let line = reader::get_lines(data_path)?
+        for id_range_string in reader::get_lines(data_path)?
             .next()
-            .expect("The data files for this challenge always only contain 1 line.");
-
-        let mut id_sum = 0;
-        for data_string in line.split(',') {
-            let id_range = IDRange::parse(data_string)?;
+            .expect("The data files for this challenge always only contain 1 line.")
+            .split(',')
+        {
+            let id_range = IDRange::parse(id_range_string)?;
             id_sum += id_range.invalid_id_sum();
         }
 
@@ -127,9 +126,7 @@ mod part_two {
     impl IDRange {
         fn parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
             let mut parts = data_string.split('-');
-            let lower = parts.next();
-            let upper = parts.next();
-            let (Some(lower), Some(upper)) = (lower, upper) else {
+            let (Some(lower), Some(upper)) = (parts.next(), parts.next()) else {
                 return Err(format!(
                     "Could not parse IDRange from data string: [{}]!",
                     data_string
@@ -176,15 +173,16 @@ mod part_two {
     }
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        let mut id_sum = 0;
+
         // get_lines returns an iterator over the lines of the file. next() attempts to return the
         // first line, which we then ensure is there with expect().
-        let line = reader::get_lines(data_path)?
+        for id_range_string in reader::get_lines(data_path)?
             .next()
-            .expect("The data files for this challenge always only contain 1 line.");
-
-        let mut id_sum = 0;
-        for data_string in line.split(',') {
-            let id_range = IDRange::parse(data_string)?;
+            .expect("The data files for this challenge always only contain 1 line.")
+            .split(',')
+        {
+            let id_range = IDRange::parse(id_range_string)?;
             id_sum += id_range.invalid_id_sum();
         }
 
