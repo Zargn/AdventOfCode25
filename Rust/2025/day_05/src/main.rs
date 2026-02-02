@@ -1,11 +1,25 @@
-use std::error::Error;
-
-mod data_parser;
-mod operations;
 mod reader;
 
+#[cfg(test)]
+mod tests;
+
+#[allow(dead_code)]
+pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 3;
+#[allow(dead_code)]
+pub const PART_ONE_EXPECTED_VALUE: u64 = 598;
+
+#[allow(dead_code)]
+pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 14;
+#[allow(dead_code)]
+pub const PART_TWO_EXPECTED_VALUE: u64 = 360341832208407;
+
+//
+
+//
+
 /*
-Part One:
+Part One
+##################################################################################################
 
 This time we have a set of value ranges, and another set of values. We need to figure out which values
 doesn't fit inside any of the ranges.
@@ -17,10 +31,70 @@ value fits inside the range.
 Simply a if statement: if value >= lower && value <= upper
 Iterate through the list of ranges until the value fits in a range or all ranges have been checked.
 If the value fits in a range then add 1 to a counter.
+*/
+mod part_one {
+    use crate::reader;
+    use std::error::Error;
 
+    struct IDRange {
+        upper: u64,
+        lower: u64,
+    }
 
+    impl IDRange {
+        fn in_range(&self, value: &u64) -> bool {
+            self.lower <= *value && *value <= self.upper
+        }
 
-Part Two:
+        fn parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
+            let mut parts = data_string.split('-');
+            let (Some(lower), Some(upper)) = (parts.next(), parts.next()) else {
+                return Err("Invalid Range Format".into());
+            };
+            Ok(IDRange {
+                upper: upper.parse()?,
+                lower: lower.parse()?,
+            })
+        }
+
+        /// Compressed version of parse().
+        /// Does the same thing but with less code.
+        fn compressed_parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
+            let mut parts = data_string.split('-');
+            Ok(IDRange {
+                lower: parts.next().ok_or("Invalid Range Format")?.parse()?,
+                upper: parts.next().ok_or("Invalid Range Format")?.parse()?,
+            })
+        }
+    }
+
+    pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        let lines: Vec<String> = reader::get_lines(data_path)?.collect();
+        let mut ranges: Vec<IDRange> = Vec::new();
+
+        for line in lines.iter().take_while(|line| !line.is_empty()) {
+            ranges.push(IDRange::compressed_parse(line)?);
+        }
+
+        let mut fresh_ingredients: u64 = 0;
+        for line in lines.iter().skip(ranges.len() + 1) {
+            let value: u64 = line.parse()?;
+            if ranges.iter().any(|range| range.in_range(&value)) {
+                fresh_ingredients += 1;
+            }
+        }
+
+        Ok(fresh_ingredients)
+    }
+}
+
+//
+
+//
+
+/*
+Part Two
+##################################################################################################
 
 At first glance part two seems simple. We just need to add together the ranges in the data file and count
 how many valid IDs can exist.
@@ -51,210 +125,125 @@ This should be enough to merge any overlapping ranges.
 Then count the total by looping through all ranges adding the following to the total
 range.upper - range.lower
 
-
-
 */
+mod part_two {
+    use crate::reader;
+    use std::error::Error;
 
-#[derive(Clone, Copy, Debug)]
-struct IDRange {
-    upper: u64,
-    lower: u64,
-}
-
-impl IDRange {
-    fn in_range(&self, value: &u64) -> bool {
-        self.lower <= *value && *value <= self.upper
+    #[derive(Clone, Copy, Debug)]
+    struct IDRange {
+        upper: u64,
+        lower: u64,
     }
 
-    fn attempt_merge(&mut self, other: &IDRange) -> bool {
-        if !((self.upper >= other.lower && self.lower <= other.lower)
-            || (self.upper >= other.upper && self.lower <= other.upper)
-            || (self.upper <= other.upper && self.lower >= other.lower))
-        {
-            return false;
+    impl IDRange {
+        fn in_range(&self, value: &u64) -> bool {
+            self.lower <= *value && *value <= self.upper
         }
 
-        let new_upper = if self.upper >= other.upper {
-            self.upper
-        } else {
-            other.upper
-        };
-        let new_lower = if self.lower <= other.lower {
-            self.lower
-        } else {
-            other.lower
-        };
-
-        self.upper = new_upper;
-        self.lower = new_lower;
-
-        true
-    }
-
-    fn range_count(&self) -> u64 {
-        self.upper - self.lower + 1 // Add 1 since the range is inclusive.
-    }
-
-    fn parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
-        let mut parts = data_string.split('-');
-        let (Some(lower), Some(upper)) = (parts.next(), parts.next()) else {
-            return Err("Invalid Range Format".into());
-        };
-        Ok(IDRange {
-            upper: upper.parse()?,
-            lower: lower.parse()?,
-        })
-    }
-
-    /// Compressed version of parse().
-    /// Does the same thing but with less code.
-    fn compressed_parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
-        let mut parts = data_string.split('-');
-        Ok(IDRange {
-            lower: parts.next().ok_or("Invalid Range Format")?.parse()?,
-            upper: parts.next().ok_or("Invalid Range Format")?.parse()?,
-        })
-    }
-}
-
-fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-    let mut lines = reader::get_lines(data_path)?;
-    let mut ranges: Vec<IDRange> = Vec::new();
-
-    loop {
-        let Some(line) = lines.next() else {
-            return Err("Data file ended before any values was reached!".into());
-        };
-        if line.is_empty() {
-            break;
-        }
-        ranges.push(IDRange::parse(&line)?);
-    }
-
-    let mut fresh_ingredients: u64 = 0;
-    // This iter starts where the above loop stopped reading at the empty space.
-    for line in lines {
-        let value: u64 = line.parse()?;
-        for range in &ranges {
-            if range.in_range(&value) {
-                //println!("[{}] is in range [{}-{}]", value, range.lower, range.upper);
-                fresh_ingredients += 1;
-                break;
+        fn attempt_merge(&mut self, other: &IDRange) -> bool {
+            if !((self.upper >= other.lower && self.lower <= other.lower)
+                || (self.upper >= other.upper && self.lower <= other.upper)
+                || (self.upper <= other.upper && self.lower >= other.lower))
+            {
+                return false;
             }
-        }
-    }
 
-    Ok(fresh_ingredients)
-}
-
-/// Compressed version of calculate.
-/// Does the same thing as calculate() but with more compact code. Sacrifices some error clarity.
-fn compressed_calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-    let lines: Vec<String> = reader::get_lines(data_path)?.collect();
-    let mut ranges: Vec<IDRange> = Vec::new();
-
-    for line in lines.iter().take_while(|line| !line.is_empty()) {
-        ranges.push(IDRange::compressed_parse(line)?);
-    }
-
-    let mut fresh_ingredients: u64 = 0;
-    for line in lines.iter().skip(ranges.len() + 1) {
-        let value: u64 = line.parse()?;
-        if ranges.iter().any(|range| range.in_range(&value)) {
-            fresh_ingredients += 1;
-        }
-    }
-
-    Ok(fresh_ingredients)
-}
-
-fn calculate_part_two(data_path: &str) -> Result<u64, Box<dyn Error>> {
-    let lines: Vec<String> = reader::get_lines(data_path)?.collect();
-    let mut ranges: Vec<IDRange> = Vec::new();
-
-    for line in lines.iter().take_while(|line| !line.is_empty()) {
-        ranges.push(IDRange::compressed_parse(line)?);
-    }
-
-    let mut ranges_len = ranges.len();
-    let mut outer_index = 0;
-    while outer_index < ranges_len {
-        let mut range = ranges[outer_index];
-        let mut i = outer_index + 1;
-        while i < ranges_len {
-            let other_range = ranges[i];
-            if range.attempt_merge(&other_range) {
-                ranges.remove(i);
-                ranges[outer_index] = range;
-                i = outer_index + 1;
-                ranges_len -= 1;
+            let new_upper = if self.upper >= other.upper {
+                self.upper
             } else {
-                i += 1;
-            }
+                other.upper
+            };
+            let new_lower = if self.lower <= other.lower {
+                self.lower
+            } else {
+                other.lower
+            };
+
+            self.upper = new_upper;
+            self.lower = new_lower;
+
+            true
         }
-        outer_index += 1;
+
+        fn range_count(&self) -> u64 {
+            self.upper - self.lower + 1 // Add 1 since the range is inclusive.
+        }
+
+        fn parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
+            let mut parts = data_string.split('-');
+            let (Some(lower), Some(upper)) = (parts.next(), parts.next()) else {
+                return Err("Invalid Range Format".into());
+            };
+            Ok(IDRange {
+                upper: upper.parse()?,
+                lower: lower.parse()?,
+            })
+        }
+
+        /// Compressed version of parse().
+        /// Does the same thing but with less code.
+        fn compressed_parse(data_string: &str) -> Result<IDRange, Box<dyn Error>> {
+            let mut parts = data_string.split('-');
+            Ok(IDRange {
+                lower: parts.next().ok_or("Invalid Range Format")?.parse()?,
+                upper: parts.next().ok_or("Invalid Range Format")?.parse()?,
+            })
+        }
     }
 
-    let mut count = 0;
-    for range in ranges {
-        count += range.range_count();
-    }
+    pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        let lines: Vec<String> = reader::get_lines(data_path)?.collect();
+        let mut ranges: Vec<IDRange> = Vec::new();
 
-    Ok(count)
+        for line in lines.iter().take_while(|line| !line.is_empty()) {
+            ranges.push(IDRange::compressed_parse(line)?);
+        }
+
+        let mut ranges_len = ranges.len();
+        let mut outer_index = 0;
+        while outer_index < ranges_len {
+            let mut range = ranges[outer_index];
+            let mut i = outer_index + 1;
+            while i < ranges_len {
+                let other_range = ranges[i];
+                if range.attempt_merge(&other_range) {
+                    ranges.remove(i);
+                    ranges[outer_index] = range;
+                    i = outer_index + 1;
+                    ranges_len -= 1;
+                } else {
+                    i += 1;
+                }
+            }
+            outer_index += 1;
+        }
+
+        let mut count = 0;
+        for range in ranges {
+            count += range.range_count();
+        }
+
+        Ok(count)
+    }
 }
+
+//
+
+//
+
+// Default controller code. Is the same between projects.
+// ###############################################################################################
 
 fn main() {
-    println!("Part One:");
-    match calculate("data.txt") {
+    print!("Running Program...\n\nPart One ");
+    match part_one::calculate("data.txt") {
         Ok(value) => println!("Result:\n{}", value),
-        Err(err) => println!("Error occured:\n{}", err),
+        Err(err) => println!("FAILED with error:\n{}", err),
     }
-    match compressed_calculate("data.txt") {
-        Ok(value) => println!("Result:\n{}", value),
-        Err(err) => println!("Error occured:\n{}", err),
-    }
-    println!("\nPart Two:");
-    match calculate_part_two("data.txt") {
-        Ok(value) => println!("Result:\n{}", value),
-        Err(err) => println!("Error occured:\n{}", err),
-    }
-}
-
-#[test]
-fn calculate_test() {
-    let expected_value = 3;
-    match calculate("testdata.txt") {
-        Ok(value) => assert_eq!(
-            value, expected_value,
-            "Program using testdata.txt finished but result was wrong! Expected: {} but received: {}",
-            expected_value, value
-        ),
-        Err(err) => panic!("Error occured:\n{}", err),
-    }
-}
-
-#[test]
-fn calculate_part_two_test() {
-    let expected_value = 14;
-    match calculate_part_two("testdata.txt") {
-        Ok(value) => assert_eq!(
-            value, expected_value,
-            "Program using testdata.txt finished but result was wrong! Expected: {} but received: {}",
-            expected_value, value
-        ),
-        Err(err) => panic!("Error occured:\n{}", err),
-    }
-}
-
-#[test]
-fn compressed_calculate_test() {
-    let expected_value = 3;
-    match compressed_calculate("testdata.txt") {
-        Ok(value) => assert_eq!(
-            value, expected_value,
-            "Program using testdata.txt finished but result was wrong! Expected: {} but received: {}",
-            expected_value, value
-        ),
-        Err(err) => panic!("Error occured:\n{}", err),
+    print!("\nPart Two ");
+    match part_two::calculate("data.txt") {
+        Ok(value) => println!("Result:\n{}\n", value),
+        Err(err) => println!("FAILED with error:\n{}\n", err),
     }
 }
