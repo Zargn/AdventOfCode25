@@ -1,11 +1,25 @@
-use std::error::Error;
-
-mod data_parser;
-mod operations;
 mod reader;
 
+#[cfg(test)]
+mod tests;
+
+#[allow(dead_code)]
+pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 357;
+#[allow(dead_code)]
+pub const PART_ONE_EXPECTED_VALUE: u64 = 17766;
+
+#[allow(dead_code)]
+pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 3121910778619;
+#[allow(dead_code)]
+pub const PART_TWO_EXPECTED_VALUE: u64 = 176582889354075;
+
+//
+
+//
+
 /*
-Part One:
+Part One
+##################################################################################################
 
 We have a list of numbers where we need to select any two numbers in the order of left to
 right that forms the largest two digit number when combined as a string.
@@ -26,10 +40,58 @@ Instead of comparing the battery in the else if statement we would:
     - Replace else if with just if.
     - Replace the battery with the battery after the current one.
 This would allow us to skip some of the extra stuff after the loop.
+*/
+mod part_one {
+    use crate::reader;
+    use std::error::Error;
 
+    struct BatteryBank {
+        batteries: Vec<u8>,
+    }
 
+    impl BatteryBank {
+        fn parse(data_string: &str) -> Result<BatteryBank, Box<dyn Error>> {
+            let mut batteries = Vec::new();
+            for c in data_string.chars() {
+                batteries.push(c.to_string().parse()?);
+            }
+            Ok(BatteryBank { batteries })
+        }
 
-Part Two:
+        fn joltage(&self) -> u8 {
+            let (mut highest, mut second_highest) = (0, 0);
+            for i in 0..self.batteries.len() - 1 {
+                let battery = self.batteries[i];
+                if battery > highest {
+                    highest = battery;
+                    second_highest = 0;
+                }
+                let next_battery = self.batteries[i + 1];
+                if next_battery > second_highest {
+                    second_highest = next_battery;
+                }
+            }
+            (highest * 10) + second_highest
+        }
+    }
+
+    pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        let mut count: u64 = 0;
+        for line in reader::get_lines(data_path)? {
+            count += BatteryBank::parse(&line)?.joltage() as u64;
+        }
+
+        Ok(count)
+    }
+}
+
+//
+
+//
+
+/*
+Part Two
+##################################################################################################
 
 We still have a list of numbers but now we need to select 12 digits instead of 2 with the
 same rules as before.
@@ -53,102 +115,88 @@ In a while loop:
 
     Add 1 to index.
 return the list of digits assembled into a full 12 digit integer.
-
-
-
 */
-
-struct BatteryBank {
-    batteries: Vec<u8>,
-}
-
-const BATTERY_COUNT: usize = 12;
-
-impl BatteryBank {
-    fn parse(data_string: &str) -> Result<BatteryBank, Box<dyn Error>> {
-        let mut batteries = Vec::new();
-        for c in data_string.chars() {
-            batteries.push(c.to_string().parse()?);
-        }
-        Ok(BatteryBank { batteries })
+mod part_two {
+    use crate::reader;
+    use std::error::Error;
+    struct BatteryBank {
+        batteries: Vec<u8>,
     }
 
-    fn joltage(&self) -> u64 {
-        let (mut digits_left, mut highest_value, mut value_index, mut index) =
-            (BATTERY_COUNT, 0, 0, 0);
-        let mut selected_digits: Vec<u8> = Vec::new();
-        loop {
-            if index > self.batteries.len() - digits_left {
-                index = value_index + 1;
-                selected_digits.push(highest_value);
-                (highest_value, value_index) = (0, 0);
-                digits_left -= 1;
-                if digits_left == 0 {
-                    break;
+    const BATTERY_COUNT: usize = 12;
+
+    impl BatteryBank {
+        fn parse(data_string: &str) -> Result<BatteryBank, Box<dyn Error>> {
+            let mut batteries = Vec::new();
+            for c in data_string.chars() {
+                batteries.push(c.to_string().parse()?);
+            }
+            Ok(BatteryBank { batteries })
+        }
+
+        fn joltage(&self) -> u64 {
+            let (mut digits_left, mut highest_value, mut value_index, mut index) =
+                (BATTERY_COUNT, 0, 0, 0);
+            let mut selected_digits: Vec<u8> = Vec::new();
+            loop {
+                if index > self.batteries.len() - digits_left {
+                    index = value_index + 1;
+                    selected_digits.push(highest_value);
+                    (highest_value, value_index) = (0, 0);
+                    digits_left -= 1;
+                    if digits_left == 0 {
+                        break;
+                    }
                 }
+
+                let battery = self.batteries[index];
+                if battery > highest_value {
+                    highest_value = battery;
+                    value_index = index;
+                }
+
+                index += 1;
             }
 
-            let battery = self.batteries[index];
-            if battery > highest_value {
-                highest_value = battery;
-                value_index = index;
-            }
-
-            index += 1;
+            Self::assemble_digits(&selected_digits)
         }
 
-        Self::assemble_digits(&selected_digits)
+        fn assemble_digits(digits: &Vec<u8>) -> u64 {
+            let (mut result, mut multiplier) = (0, 100000000000);
+            for value in digits {
+                result += (*value as u64) * multiplier;
+                multiplier /= 10;
+            }
+            result
+        }
     }
 
-    fn assemble_digits(digits: &Vec<u8>) -> u64 {
-        let (mut result, mut multiplier) = (0, 100000000000);
-        for value in digits {
-            result += (*value as u64) * multiplier;
-            multiplier /= 10;
+    pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        let mut count: u64 = 0;
+        for line in reader::get_lines(data_path)? {
+            count += BatteryBank::parse(&line)?.joltage();
         }
-        result
+
+        Ok(count)
     }
 }
 
-fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-    let mut count: u64 = 0;
-    for line in reader::get_lines(data_path)? {
-        count += BatteryBank::parse(&line)?.joltage();
-    }
+//
 
-    Ok(count)
-}
+//
+
+// Default controller code. Is the same between projects.
+// ###############################################################################################
 
 fn main() {
-    match calculate("data.txt") {
+    print!("Running Program...\n\nPart One ");
+    match part_one::calculate("data.txt") {
         Ok(value) => println!("Result:\n{}", value),
-        Err(err) => println!("Error occured:\n{}", err),
+        Err(err) => println!("FAILED with error:\n{}", err),
+    }
+    print!("\nPart Two ");
+    match part_two::calculate("data.txt") {
+        Ok(value) => println!("Result:\n{}\n", value),
+        Err(err) => println!("FAILED with error:\n{}\n", err),
     }
 }
-
-#[test]
-fn calculate_test() {
-    let expected_value = 3121910778619;
-    match calculate("testdata.txt") {
-        Ok(value) => assert_eq!(
-            value, expected_value,
-            "Program using testdata.txt finished but result was wrong! Expected: {} but received: {}",
-            expected_value, value
-        ),
-        Err(err) => panic!("Error occured:\n{}", err),
-    }
-}
-
-/*
-#[test]
-fn calculate_small_test() {
-    let expected_value = 0;
-    match calculate("smalltestdata.txt") {
-        Ok(value) => assert_eq!(
-            value, expected_value,
-            "Program using smalltestdata.txt finished but result was wrong! Expected: {} but received: {}",
-            expected_value, value
-        ),
-        Err(err) => panic!("Error occured:\n{}", err),
-    }
-} // */
