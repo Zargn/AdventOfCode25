@@ -35,10 +35,24 @@ This should be quite easy using string.split(" ") and filter.
 */
 mod part_one {
     use crate::reader;
-    use std::{
-        error::Error,
-        fmt::{write, Display},
-    };
+    use std::{error::Error, fmt::Display};
+
+    #[derive(Debug)]
+    enum PuzzleError {
+        DifferentLineLenght,
+        InvalidOperator(String),
+    }
+
+    impl Error for PuzzleError {}
+    impl Display for PuzzleError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let error_string = match self {
+                Self::DifferentLineLenght => "The data lines are of different lenght!",
+                Self::InvalidOperator(s) => &format!("Could not parse operator from: [{}]", s),
+            };
+            write!(f, "Puzzle Error: {}", error_string)
+        }
+    }
 
     enum Operator {
         Add,
@@ -50,7 +64,7 @@ mod part_one {
             match data_string {
                 "+" => Ok(Operator::Add),
                 "*" => Ok(Operator::Mul),
-                _ => Err(format!("Could not parse operator from: [{}]", data_string).into()),
+                _ => Err(PuzzleError::InvalidOperator(data_string.into()).into()),
             }
         }
 
@@ -70,29 +84,13 @@ mod part_one {
         !str.is_empty()
     }
 
-    #[derive(Debug)]
-    enum PuzzleError {
-        DifferentLineLenght,
-    }
-
-    impl Display for PuzzleError {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(
-                f,
-                "Puzzle Error: {}",
-                match self {
-                    Self::DifferentLineLenght => "DifferentLineLenght",
-                }
-            )
-        }
-    }
-
-    impl Error for PuzzleError {}
-
     pub fn calculate(path: &str) -> Result<u64, Box<dyn Error>> {
         let lines: Vec<String> = reader::get_lines(path)?.collect();
 
         let mut value_lines: Vec<Vec<u64>> = Vec::new();
+        let mut operators: Vec<Operator> = Vec::new();
+        let mut sum = 0;
+
         for line in lines.iter().take(lines.len() - 1) {
             let mut values = Vec::new();
             for value_str in line.split(' ').filter(is_not_empty) {
@@ -101,17 +99,14 @@ mod part_one {
             value_lines.push(values);
         }
 
-        let mut operators: Vec<Operator> = Vec::new();
         for operator_str in lines[lines.len() - 1].split(' ').filter(is_not_empty) {
             operators.push(Operator::parse(operator_str)?);
         }
 
         if value_lines.iter().any(|line| line.len() != operators.len()) {
-            //return Err("Data file contains lines with different amount of columns!".into());
-            return Err(Box::new(PuzzleError::DifferentLineLenght));
+            return Err(PuzzleError::DifferentLineLenght.into());
         }
 
-        let mut sum = 0;
         for (i, operator) in operators.iter().enumerate() {
             let mut line_sum = if operator.is_mul() { 1 } else { 0 };
             for value in value_lines.iter().map(|line| line[i]) {
@@ -155,43 +150,23 @@ Once the loop is done add temp_value to sum and return the result
 */
 mod part_two {
     use crate::reader;
-    use std::error::Error;
+    use std::{error::Error, fmt::Display};
 
-    pub fn calculate(path: &str) -> Result<u64, Box<dyn Error>> {
-        let lines: Vec<Vec<char>> = reader::get_lines(path)?
-            .map(|line| line.chars().collect())
-            .collect();
+    #[derive(Debug)]
+    enum PuzzleError {
+        DifferentLineLenght,
+        InvalidOperator(String),
+    }
 
-        let line_length = lines[0].len();
-        if lines.iter().any(|line| line.len() != line_length) {
-            println!("{:?}", lines);
-            return Err("The data lines does not have the same lenth!".into());
+    impl Error for PuzzleError {}
+    impl Display for PuzzleError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let error_string = match self {
+                Self::DifferentLineLenght => "The data lines are of different lenght!",
+                Self::InvalidOperator(s) => &format!("Could not parse operator from: [{}]", s),
+            };
+            write!(f, "Puzzle Error: {}", error_string)
         }
-
-        let (mut sum, mut operator) = (0, Operator::Add(0));
-        for i in 0..lines[0].len() {
-            if let Ok(new_operator) = Operator::parse(&lines[lines.len() - 1][i].to_string()) {
-                sum += operator.value();
-                println!("Value: {}", operator.value());
-                operator = new_operator;
-            }
-
-            if let Ok(value) = {
-                let mut s = String::new();
-                for line in lines.iter().take(lines.len() - 1) {
-                    if line[i] != ' ' {
-                        s.push(line[i]);
-                    }
-                }
-                s.parse::<u16>()
-            } {
-                operator.combine(&value);
-                //print!(" {value} ");
-            }
-        }
-        sum += operator.value();
-
-        Ok(sum)
     }
 
     enum Operator {
@@ -204,7 +179,7 @@ mod part_two {
             match data_string {
                 "+" => Ok(Operator::Add(0)),
                 "*" => Ok(Operator::Mul(1)), // 1 since the first combine would otherwise multiply by 0
-                _ => Err(format!("Could not parse operator from: [{}]", data_string).into()),
+                _ => Err(PuzzleError::InvalidOperator(data_string.into()).into()),
             }
         }
 
@@ -221,6 +196,39 @@ mod part_two {
                 Self::Mul(value) => *value,
             }
         }
+    }
+
+    pub fn calculate(path: &str) -> Result<u64, Box<dyn Error>> {
+        let lines: Vec<Vec<char>> = reader::get_lines(path)?
+            .map(|line| line.chars().collect())
+            .collect();
+
+        if lines.iter().any(|line| line.len() != lines[0].len()) {
+            return Err(PuzzleError::DifferentLineLenght.into());
+        }
+
+        let (mut sum, mut operator) = (0, Operator::Add(0));
+        for i in 0..lines[0].len() {
+            if let Ok(new_operator) = Operator::parse(&lines[lines.len() - 1][i].to_string()) {
+                sum += operator.value();
+                operator = new_operator;
+            }
+
+            if let Ok(value) = {
+                let mut s = String::new();
+                for line in lines.iter().take(lines.len() - 1) {
+                    if line[i] != ' ' {
+                        s.push(line[i]);
+                    }
+                }
+                s.parse::<u16>()
+            } {
+                operator.combine(&value);
+            }
+        }
+        sum += operator.value();
+
+        Ok(sum)
     }
 }
 
