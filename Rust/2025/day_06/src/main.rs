@@ -1,3 +1,5 @@
+#[macro_use]
+mod macros;
 mod reader;
 
 #[cfg(test)]
@@ -33,7 +35,10 @@ This should be quite easy using string.split(" ") and filter.
 */
 mod part_one {
     use crate::reader;
-    use std::error::Error;
+    use std::{
+        error::Error,
+        fmt::{write, Display},
+    };
 
     enum Operator {
         Add,
@@ -65,6 +70,25 @@ mod part_one {
         !str.is_empty()
     }
 
+    #[derive(Debug)]
+    enum PuzzleError {
+        DifferentLineLenght,
+    }
+
+    impl Display for PuzzleError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "Puzzle Error: {}",
+                match self {
+                    Self::DifferentLineLenght => "DifferentLineLenght",
+                }
+            )
+        }
+    }
+
+    impl Error for PuzzleError {}
+
     pub fn calculate(path: &str) -> Result<u64, Box<dyn Error>> {
         let lines: Vec<String> = reader::get_lines(path)?.collect();
 
@@ -83,7 +107,8 @@ mod part_one {
         }
 
         if value_lines.iter().any(|line| line.len() != operators.len()) {
-            return Err("Data file contains lines with different amount of columns!".into());
+            //return Err("Data file contains lines with different amount of columns!".into());
+            return Err(Box::new(PuzzleError::DifferentLineLenght));
         }
 
         let mut sum = 0;
@@ -161,7 +186,7 @@ mod part_two {
                 s.parse::<u16>()
             } {
                 operator.combine(&value);
-                print!(" {value} ");
+                //print!(" {value} ");
             }
         }
         sum += operator.value();
@@ -207,14 +232,22 @@ mod part_two {
 // ###############################################################################################
 
 fn main() {
-    print!("Running Program...\n\nPart One ");
-    match part_one::calculate("data.txt") {
-        Ok(value) => println!("Result:\n{}", value),
-        Err(err) => println!("FAILED with error:\n{}", err),
+    println!("Running Program...");
+
+    if cfg!(feature = "bench") {
+        println!("Benchmarks are enabled!\n");
     }
-    print!("\nPart Two ");
-    match part_two::calculate("data.txt") {
-        Ok(value) => println!("Result:\n{}\n", value),
-        Err(err) => println!("FAILED with error:\n{}\n", err),
-    }
+
+    println!("\nPart One {}\n", {
+        match benchmark!("calculate", { part_one::calculate("data.txt") }) {
+            Ok(value) => format!("Result:\n{}", value),
+            Err(err) => format!("FAILED with error:\n{}", err),
+        }
+    });
+    println!("\nPart One {}\n", {
+        match benchmark!("calculate", { part_two::calculate("data.txt") }) {
+            Ok(value) => format!("Result:\n{}", value),
+            Err(err) => format!("FAILED with error:\n{}", err),
+        }
+    });
 }
