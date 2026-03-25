@@ -75,7 +75,7 @@ fn main() {
             Err(err) => format!("FAILED with error:\n{}", err),
         }
     });
-    println!("\nPart One {}\n", {
+    println!("\nPart Two {}\n", {
         match benchmark!("calculate", { part_two::calculate("data.txt") }) {
             Ok(value) => format!("Result:\n{}", value),
             Err(err) => format!("FAILED with error:\n{}", err),
