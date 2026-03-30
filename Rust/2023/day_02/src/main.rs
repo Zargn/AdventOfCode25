@@ -13,7 +13,7 @@ pub const PART_ONE_EXPECTED_VALUE: u64 = 2317;
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 2286;
 #[allow(dead_code)]
-pub const PART_TWO_EXPECTED_VALUE: u64 = 0;
+pub const PART_TWO_EXPECTED_VALUE: u64 = 74804;
 
 //
 
@@ -104,15 +104,55 @@ highest value for each of them. The maximum value found for each color is also t
 of cubes that is needed for the game to be possible.
 Next multiply the three maximums together to get the "power" of the set of cubes needed.
 Then add the "power" of each geme together to get the result.
+
+In the end part two only needed minimal changes of the same code used for part one.
+The main thing done was to change the behaviour when it earlier would exit due to a cube amount
+being over the maximum. Now we set each maximum at the start to 0, and if a amount is over
+maximum we just update the maximum to the new max value.
+Then after each part has been checked we multiply the three maximums together and return that
+to the caller to be added to the total.
 */
 mod part_two {
     use crate::reader;
     use std::error::Error;
 
-    pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-        let lines = reader::get_lines(data_path)?;
+    fn get_index(c: char) -> Result<usize, Box<dyn Error>> {
+        Ok(match c {
+            'r' => 0,
+            'g' => 1,
+            'b' => 2,
+            _ => return Err("Unexpected character at the start of color name str!".into()),
+        })
+    }
 
-        Err("NotImplemented: This problem has not been solved yet!".into())
+    fn is_possible(game_line: &str) -> Result<u64, Box<dyn Error>> {
+        let mut maximums = [0, 0, 0];
+        let parts = game_line.split([':', ';', ',']);
+        for cubes_str in parts.skip(1) {
+            let mut parts = cubes_str.split(' ').filter(|s| !s.is_empty());
+            let cube_count = parts.next().ok_or("Missing cube count!")?.parse::<u64>()?;
+            let color_index = get_index(
+                parts
+                    .next()
+                    .ok_or("Missing cube color!")?
+                    .chars()
+                    .next()
+                    .unwrap(),
+            )?;
+            if maximums[color_index] < cube_count {
+                maximums[color_index] = cube_count;
+            }
+        }
+
+        Ok(maximums[0] * maximums[1] * maximums[2])
+    }
+
+    pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        let id_sum = reader::get_lines(data_path)?
+            .map(|s| is_possible(&s))
+            .sum::<Result<u64, _>>()?;
+
+        Ok(id_sum)
     }
 }
 
