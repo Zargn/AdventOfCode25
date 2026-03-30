@@ -11,7 +11,7 @@ pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 8;
 pub const PART_ONE_EXPECTED_VALUE: u64 = 2317;
 
 #[allow(dead_code)]
-pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 0;
+pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 2286;
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_VALUE: u64 = 0;
 
@@ -98,6 +98,12 @@ mod part_one {
 Part Two
 ##################################################################################################
 
+Now we need to figure out the minimum amount needed for each game instead.
+Basically for each game check the maximum mentioned amount of cubes with each color and save the
+highest value for each of them. The maximum value found for each color is also the minimum amount
+of cubes that is needed for the game to be possible.
+Next multiply the three maximums together to get the "power" of the set of cubes needed.
+Then add the "power" of each geme together to get the result.
 */
 mod part_two {
     use crate::reader;
