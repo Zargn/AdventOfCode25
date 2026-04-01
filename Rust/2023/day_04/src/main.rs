@@ -156,23 +156,23 @@ mod part_two {
         };
 
         let winning_numbers = extract_integers(winning_numbers)?;
-        let our_numbers = extract_integers(our_numbers)?;
 
-        let mut matches = 0;
-        for value in &our_numbers {
-            if winning_numbers.contains(value) {
-                matches += 1;
-            }
-        }
+        let matches = extract_integers(our_numbers)?
+            .iter()
+            .filter(|nr| winning_numbers.contains(nr))
+            .count();
 
-        Ok(matches)
+        Ok(matches as u64)
     }
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        // Reads all the lines of the datafile, checks how many matches each card has, then
+        // collecting them all into a list of value pairs (matches, 1) for each row.
         let mut cards: Vec<(u64, u64)> = reader::get_lines(data_path)?
             .map(|line| process_card(&line).map(|v| (v, 1)))
             .collect::<Result<Vec<(u64, u64)>, _>>()?;
 
+        // Iterates through the list calculating the count of each card.
         for i in 0..cards.len() {
             let (matches, count) = cards[i];
             for i in i + 1..i + 1 + matches as usize {
@@ -182,6 +182,7 @@ mod part_two {
             }
         }
 
+        // Sums all the card counts in the list.
         Ok(cards.iter().map(|(_, count)| count).sum())
     }
 }
