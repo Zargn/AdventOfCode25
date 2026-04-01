@@ -13,7 +13,7 @@ pub const PART_ONE_EXPECTED_VALUE: u64 = 557705;
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 467835;
 #[allow(dead_code)]
-pub const PART_TWO_EXPECTED_VALUE: u64 = 0;
+pub const PART_TWO_EXPECTED_VALUE: u64 = 84266818;
 
 //
 
@@ -112,15 +112,8 @@ mod part_one {
                     if let Some(Tile::NumberStart(value, length)) =
                         self.tiles.get(y).and_then(|r| r.get(x))
                     {
-                        println!(
-                            "Found number start at: x: {}, y: {} with length: {}",
-                            x, y, length
-                        );
                         if self.find_symbol(x, y, *length) {
-                            println!("Added {value} to part numbers.");
                             part_numbers.push(*value);
-                        } else {
-                            println!("\n{} is not a part number!\n", value);
                         }
                     }
                 }
@@ -129,10 +122,8 @@ mod part_one {
         }
 
         fn find_symbol(&self, x: usize, y: usize, length: usize) -> bool {
-            println!("Searching for symbols...");
             for f_y in 1.max(y) - 1..=y + 1 {
                 for f_x in 1.max(x) - 1..=x + length + 1 {
-                    println!("Checking {} {}", f_x, f_y);
                     if let Some(Tile::Symbol) = self.tiles.get(f_y).and_then(|r| r.get(f_x)) {
                         return true;
                     }
@@ -169,10 +160,6 @@ mod part_one {
                             if let Tile::NumberStart(value, length) = number_start {
                                 *value = (*value * 10) + digit;
                                 *length += 1;
-                                println!(
-                                    "Found numberpart. Added together with start to get: ({}, {})",
-                                    value, length
-                                );
                             } else {
                                 return Err(
                                     "number_builder pointed to a non-number_start tile!".into()
@@ -181,7 +168,6 @@ mod part_one {
                         } else {
                             schematic_line.push(Tile::NumberStart(digit, 0));
                             number_builder = Some(x);
-                            println!("Started number at {} with value {}", x, digit);
                         }
                     }
                     _ => {
@@ -199,7 +185,6 @@ mod part_one {
         let schematic = get_schematic(data_path)?;
 
         let part_numbers = schematic.scan_part_numbers()?;
-        println!("part numbers: {:?}", part_numbers);
 
         Ok(part_numbers.iter().map(|u| *u as u64).sum())
     }
@@ -249,12 +234,135 @@ After checking all 8 tiles:
 */
 mod part_two {
     use crate::reader;
-    use std::error::Error;
+    use std::{collections::HashMap, error::Error};
+
+    #[derive(Default)]
+    struct Schematic {
+        tiles: Vec<Vec<Tile>>,
+        height: usize,
+        width: usize,
+    }
+
+    impl Schematic {
+        fn add_row(&mut self, row: Vec<Tile>) -> Result<(), Box<dyn Error>> {
+            if self.tiles.is_empty() {
+                self.width = row.len();
+                self.tiles.push(row);
+                self.height = 1;
+            } else {
+                if row.len() != self.width {
+                    return Err("Could not add row due to row length mismatch!".into());
+                }
+                self.height += 1;
+                self.tiles.push(row);
+            }
+            Ok(())
+        }
+
+        fn scan_gear_ratios(&self) -> Result<Vec<u64>, Box<dyn Error>> {
+            let mut gear_ratios = Vec::new();
+            for y in 0..self.height {
+                for x in 0..self.width {
+                    if let Some(Tile::Gear) = self.tiles.get(y).and_then(|r| r.get(x)) {
+                        let numbers = self.get_surrounding_part_numbers(x, y);
+                        if numbers.len() != 2 {
+                            continue;
+                        }
+                        // Unwrap is okay as this will only run IF the two values exist in the vec.
+                        gear_ratios.push(
+                            *numbers.first().unwrap() as u64 * *numbers.get(1).unwrap() as u64,
+                        );
+                    }
+                }
+            }
+            Ok(gear_ratios)
+        }
+
+        fn get_surrounding_part_numbers(&self, x: usize, y: usize) -> Vec<u32> {
+            let mut part_numbers = HashMap::new();
+            for f_y in 1.max(y) - 1..=y + 1 {
+                for f_x in 1.max(x) - 1..=x + 1 {
+                    let Some(tile) = self.tiles.get(f_y).and_then(|r| r.get(f_x)) else {
+                        continue;
+                    };
+
+                    let (part_number, start_index) = match tile {
+                        Tile::NumberPart(start_index) => {
+                            match self.tiles.get(f_y).and_then(|r| r.get(*start_index)) {
+                                Some(Tile::NumberStart(value, _)) => (value, *start_index),
+                                _ => continue,
+                            }
+                        }
+                        Tile::NumberStart(value, _) => (value, f_x),
+                        _ => continue,
+                    };
+
+                    part_numbers.insert((start_index, f_y), *part_number);
+                }
+            }
+            part_numbers.into_values().collect()
+        }
+    }
+
+    enum Tile {
+        Empty,
+        Symbol,
+        Gear,
+        NumberStart(u32, usize),
+        NumberPart(usize),
+    }
+
+    fn get_schematic(data_path: &str) -> Result<Schematic, Box<dyn Error>> {
+        let mut schematic = Schematic::default();
+        for (y, line) in reader::get_lines(data_path)?.enumerate() {
+            let mut schematic_line = Vec::new();
+            let mut number_builder: Option<usize> = None;
+            for (x, c) in line.chars().enumerate() {
+                match c {
+                    '.' => {
+                        number_builder = None;
+                        schematic_line.push(Tile::Empty)
+                    }
+                    '*' => {
+                        number_builder = None;
+                        schematic_line.push(Tile::Gear)
+                    }
+                    c if c.is_ascii_digit() => {
+                        let digit = c.to_digit(10).unwrap(); // This will only run if c is a digit.
+
+                        if let Some(start_index) = number_builder {
+                            schematic_line.push(Tile::NumberPart(start_index));
+                            let number_start = schematic_line.get_mut(start_index).unwrap();
+                            if let Tile::NumberStart(value, length) = number_start {
+                                *value = (*value * 10) + digit;
+                                *length += 1;
+                            } else {
+                                return Err(
+                                    "number_builder pointed to a non-number_start tile!".into()
+                                );
+                            }
+                        } else {
+                            schematic_line.push(Tile::NumberStart(digit, 0));
+                            number_builder = Some(x);
+                        }
+                    }
+                    _ => {
+                        number_builder = None;
+                        schematic_line.push(Tile::Symbol)
+                    }
+                }
+            }
+            schematic.add_row(schematic_line)?;
+        }
+        Ok(schematic)
+    }
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-        let lines = reader::get_lines(data_path)?;
+        let schematic = get_schematic(data_path)?;
 
-        Err("NotImplemented: This problem has not been solved yet!".into())
+        let part_numbers = schematic.scan_gear_ratios()?;
+
+        Ok(part_numbers.iter().sum())
     }
 }
 
