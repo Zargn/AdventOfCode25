@@ -8,7 +8,7 @@ mod tests;
 #[allow(dead_code)]
 pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 13;
 #[allow(dead_code)]
-pub const PART_ONE_EXPECTED_VALUE: u64 = 0;
+pub const PART_ONE_EXPECTED_VALUE: u64 = 21959;
 
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 0;
@@ -50,10 +50,50 @@ mod part_one {
     use crate::reader;
     use std::error::Error;
 
-    pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-        let lines = reader::get_lines(data_path)?;
+    /// Extracts all integers in the provided string.
+    ///
+    /// Will return an error if a integer is too large to fit in a u8.
+    fn extract_integers(str: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+        Ok(str
+            .split(|c: char| !c.is_ascii_digit())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.parse::<u8>())
+            .collect::<Result<Vec<u8>, _>>()?)
+    }
 
-        Err("NotImplemented: This problem has not been solved yet!".into())
+    fn process_card(card_str: &str) -> Result<u64, Box<dyn Error>> {
+        let mut parts = card_str.split(['|', ':']);
+        parts.next();
+        let (Some(winning_numbers), Some(our_numbers)) = (parts.next(), parts.next()) else {
+            return Err(format!("Unexpected card string format! [{}]", card_str).into());
+        };
+
+        let winning_numbers = extract_integers(winning_numbers)?;
+        let our_numbers = extract_integers(our_numbers)?;
+
+        let score = benchmark!("Compare numbers: vec.contains()", {
+            let mut score = 0;
+            for value in &our_numbers {
+                if winning_numbers.contains(value) {
+                    if score == 0 {
+                        score = 1;
+                    } else {
+                        score = score + score;
+                    }
+                }
+            }
+            score
+        });
+
+        Ok(score)
+    }
+
+    pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        let mut score = 0;
+        for line in reader::get_lines(data_path)? {
+            score += process_card(&line)?;
+        }
+        Ok(score)
     }
 }
 
