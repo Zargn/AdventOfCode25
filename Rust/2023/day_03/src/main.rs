@@ -131,6 +131,67 @@ mod part_one {
             }
             false
         }
+
+        fn update_number(
+            tiles: &mut [Tile],
+            index: usize,
+            digit: u32,
+        ) -> Result<(), Box<dyn Error>> {
+            let Some(Tile::NumberStart(value, len)) = tiles.get_mut(index) else {
+                return Err("number_builder pointed to a non-number_start tile!".into());
+            };
+            *value = (*value * 10) + digit;
+            *len += 1;
+            Ok(())
+        }
+
+        fn process_char(
+            char: char,
+            char_index: usize,
+            number_builder: &mut Option<usize>,
+            tiles: &mut Vec<Tile>,
+        ) -> Result<(), Box<dyn Error>> {
+            if !char.is_ascii_digit() {
+                *number_builder = None;
+            }
+            match char {
+                c if c.is_ascii_digit() => {
+                    let digit = c.to_digit(10).unwrap(); // This will only run if c is a digit.
+
+                    match number_builder {
+                        None => {
+                            tiles.push(Tile::NumberStart(digit, 0));
+                            *number_builder = Some(char_index);
+                        }
+                        Some(start_index) => {
+                            tiles.push(Tile::NumberPart);
+                            Schematic::update_number(tiles, *start_index, digit)?;
+                        }
+                    }
+                }
+                '.' => tiles.push(Tile::Empty),
+                _ => tiles.push(Tile::Symbol),
+            }
+            Ok(())
+        }
+
+        fn from_datafile(data_path: &str) -> Result<Schematic, Box<dyn Error>> {
+            let mut schematic = Schematic::default();
+            for line in reader::get_lines(data_path)? {
+                let mut schematic_line = Vec::new();
+                let mut number_builder: Option<usize> = None;
+                for (char_index, char) in line.chars().enumerate() {
+                    Schematic::process_char(
+                        char,
+                        char_index,
+                        &mut number_builder,
+                        &mut schematic_line,
+                    )?;
+                }
+                schematic.add_row(schematic_line)?;
+            }
+            Ok(schematic)
+        }
     }
 
     enum Tile {
@@ -140,49 +201,8 @@ mod part_one {
         NumberPart,
     }
 
-    fn get_schematic(data_path: &str) -> Result<Schematic, Box<dyn Error>> {
-        let mut schematic = Schematic::default();
-        for (y, line) in reader::get_lines(data_path)?.enumerate() {
-            let mut schematic_line = Vec::new();
-            let mut number_builder: Option<usize> = None;
-            for (x, c) in line.chars().enumerate() {
-                match c {
-                    '.' => {
-                        number_builder = None;
-                        schematic_line.push(Tile::Empty)
-                    }
-                    c if c.is_ascii_digit() => {
-                        let digit = c.to_digit(10).unwrap(); // This will only run if c is a digit.
-
-                        if let Some(start_index) = number_builder {
-                            schematic_line.push(Tile::NumberPart);
-                            let number_start = schematic_line.get_mut(start_index).unwrap();
-                            if let Tile::NumberStart(value, length) = number_start {
-                                *value = (*value * 10) + digit;
-                                *length += 1;
-                            } else {
-                                return Err(
-                                    "number_builder pointed to a non-number_start tile!".into()
-                                );
-                            }
-                        } else {
-                            schematic_line.push(Tile::NumberStart(digit, 0));
-                            number_builder = Some(x);
-                        }
-                    }
-                    _ => {
-                        number_builder = None;
-                        schematic_line.push(Tile::Symbol)
-                    }
-                }
-            }
-            schematic.add_row(schematic_line)?;
-        }
-        Ok(schematic)
-    }
-
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-        let schematic = get_schematic(data_path)?;
+        let schematic = Schematic::from_datafile(data_path)?;
 
         let part_numbers = schematic.scan_part_numbers()?;
 
@@ -302,6 +322,68 @@ mod part_two {
             }
             part_numbers.into_values().collect()
         }
+
+        fn update_number(
+            tiles: &mut [Tile],
+            index: usize,
+            digit: u32,
+        ) -> Result<(), Box<dyn Error>> {
+            let Some(Tile::NumberStart(value, len)) = tiles.get_mut(index) else {
+                return Err("number_builder pointed to a non-number_start tile!".into());
+            };
+            *value = (*value * 10) + digit;
+            *len += 1;
+            Ok(())
+        }
+
+        fn process_char(
+            char: char,
+            char_index: usize,
+            number_builder: &mut Option<usize>,
+            tiles: &mut Vec<Tile>,
+        ) -> Result<(), Box<dyn Error>> {
+            if !char.is_ascii_digit() {
+                *number_builder = None;
+            }
+            match char {
+                c if c.is_ascii_digit() => {
+                    let digit = c.to_digit(10).unwrap(); // This will only run if c is a digit.
+
+                    match number_builder {
+                        None => {
+                            tiles.push(Tile::NumberStart(digit, 0));
+                            *number_builder = Some(char_index);
+                        }
+                        Some(start_index) => {
+                            tiles.push(Tile::NumberPart(*start_index));
+                            Schematic::update_number(tiles, *start_index, digit)?;
+                        }
+                    }
+                }
+                '.' => tiles.push(Tile::Empty),
+                '*' => tiles.push(Tile::Gear),
+                _ => tiles.push(Tile::Symbol),
+            }
+            Ok(())
+        }
+
+        fn from_datafile(data_path: &str) -> Result<Schematic, Box<dyn Error>> {
+            let mut schematic = Schematic::default();
+            for line in reader::get_lines(data_path)? {
+                let mut schematic_line = Vec::new();
+                let mut number_builder: Option<usize> = None;
+                for (char_index, char) in line.chars().enumerate() {
+                    Schematic::process_char(
+                        char,
+                        char_index,
+                        &mut number_builder,
+                        &mut schematic_line,
+                    )?;
+                }
+                schematic.add_row(schematic_line)?;
+            }
+            Ok(schematic)
+        }
     }
 
     enum Tile {
@@ -312,53 +394,8 @@ mod part_two {
         NumberPart(usize),
     }
 
-    fn get_schematic(data_path: &str) -> Result<Schematic, Box<dyn Error>> {
-        let mut schematic = Schematic::default();
-        for (y, line) in reader::get_lines(data_path)?.enumerate() {
-            let mut schematic_line = Vec::new();
-            let mut number_builder: Option<usize> = None;
-            for (x, c) in line.chars().enumerate() {
-                match c {
-                    '.' => {
-                        number_builder = None;
-                        schematic_line.push(Tile::Empty)
-                    }
-                    '*' => {
-                        number_builder = None;
-                        schematic_line.push(Tile::Gear)
-                    }
-                    c if c.is_ascii_digit() => {
-                        let digit = c.to_digit(10).unwrap(); // This will only run if c is a digit.
-
-                        if let Some(start_index) = number_builder {
-                            schematic_line.push(Tile::NumberPart(start_index));
-                            let number_start = schematic_line.get_mut(start_index).unwrap();
-                            if let Tile::NumberStart(value, length) = number_start {
-                                *value = (*value * 10) + digit;
-                                *length += 1;
-                            } else {
-                                return Err(
-                                    "number_builder pointed to a non-number_start tile!".into()
-                                );
-                            }
-                        } else {
-                            schematic_line.push(Tile::NumberStart(digit, 0));
-                            number_builder = Some(x);
-                        }
-                    }
-                    _ => {
-                        number_builder = None;
-                        schematic_line.push(Tile::Symbol)
-                    }
-                }
-            }
-            schematic.add_row(schematic_line)?;
-        }
-        Ok(schematic)
-    }
-
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-        let schematic = get_schematic(data_path)?;
+        let schematic = Schematic::from_datafile(data_path)?;
 
         let part_numbers = schematic.scan_gear_ratios()?;
 
