@@ -8,7 +8,7 @@ mod tests;
 #[allow(dead_code)]
 pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 288;
 #[allow(dead_code)]
-pub const PART_ONE_EXPECTED_VALUE: u64 = 0;
+pub const PART_ONE_EXPECTED_VALUE: u64 = 32076;
 
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 0;
@@ -42,10 +42,49 @@ mod part_one {
     use crate::reader;
     use std::error::Error;
 
-    pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-        let lines = reader::get_lines(data_path)?;
+    fn get_values(possible_row: Option<String>) -> Result<Vec<u64>, Box<dyn Error>> {
+        Ok(possible_row
+            .ok_or("Missing data row!")?
+            .split(|c: char| !c.is_ascii_digit())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.parse::<u64>())
+            .collect::<Result<Vec<u64>, _>>()?)
+    }
 
-        Err("NotImplemented: This problem has not been solved yet!".into())
+    fn is_winner(race_time: u64, distance: u64, hold_time: u64) -> bool {
+        (race_time - hold_time) * hold_time > distance
+    }
+
+    pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
+        let mut lines = reader::get_lines(data_path)?;
+        let times = get_values(lines.next())?;
+        let distances = get_values(lines.next())?;
+
+        let mut result = 1;
+
+        for (race_time, distance) in times.iter().zip(distances) {
+            let (mut lower, mut higher) = (0, 0);
+
+            // Find the lowest hold time that results in a new record.
+            for hold_time in 1..*race_time {
+                if is_winner(*race_time, distance, hold_time) {
+                    lower = hold_time;
+                    break;
+                }
+            }
+
+            // Find the highest hold time that results in a new record.
+            for hold_time in (1..*race_time).rev() {
+                if is_winner(*race_time, distance, hold_time) {
+                    higher = hold_time;
+                    break;
+                }
+            }
+
+            result *= higher - lower + 1;
+        }
+
+        Ok(result)
     }
 }
 
