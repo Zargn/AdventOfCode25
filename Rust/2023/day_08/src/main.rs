@@ -161,12 +161,103 @@ check that stops the loop if all nodes currently ends with 'Z'
 */
 mod part_two {
     use crate::reader;
-    use std::error::Error;
+    use std::{collections::HashMap, error::Error};
+
+    // The reason to return a bool array instead of a integer array is that we know the following:
+    // 1: There are ONLY two types of instruction. L or R.
+    // 2: There are ONLY two options to choose from in each node. Again L or R.
+    // Using a bool array means we ensure the indexes provided by the instructions are always 0 or
+    // 1 which always are in range of the connected nodes array attached to each node.
+    // If we instead returned a integer, it would technically be possible for the index to be out
+    // of range even though we would ensure it could never occur.
+    fn get_instructions(data_row: &str) -> Result<Vec<bool>, Box<dyn Error>> {
+        let mut instructions = Vec::new();
+        for c in data_row.chars() {
+            instructions.push(match c {
+                'L' => false,
+                'R' => true,
+                _ => return Err("Invalid character found in instructions row!".into()),
+            });
+        }
+        Ok(instructions)
+    }
+
+    fn get_nodes(
+        data_lines: &mut dyn Iterator<Item = String>,
+    ) -> Result<HashMap<u32, [u32; 2]>, Box<dyn Error>> {
+        let mut nodes: HashMap<u32, [u32; 2]> = HashMap::new();
+
+        for line in data_lines {
+            let mut node_names = line
+                .split(|c: char| !c.is_ascii_uppercase())
+                .filter(|s| !s.is_empty());
+            nodes.insert(
+                translate_node(node_names.next().unwrap())?,
+                [
+                    translate_node(node_names.next().ok_or("Missing second node name!")?)?,
+                    translate_node(node_names.next().ok_or("Missing third node name!")?)?,
+                ],
+            );
+        }
+
+        Ok(nodes)
+    }
+
+    // Translating the nodes is also technically not needed. String implements the required traits
+    // for the hashmap to function using them instead. But I like converting things like this to
+    // integers because it limits the type of nodes, and should in theory be more efficient as a
+    // integer is primitive type compared to a full string.
+    // It is also a fun challenge. :)
+    //
+    // Edit: Seems like the puzzle instructions mentioning it taking "significantly more steps" to
+    // find the goal was a warning.
+    // The following code passes the test data but is taking ages with the full data. It will
+    // probably solve it eventually, but I have no idea if that is a few minutes or over a day.
+    //
+    // I think we need to figure out a better way of doing this. Maybe figure out the exact "loop"
+    // each path goes in, then just use math to figure out when all loops are at a end node.
+    fn translate_node(node_name: &str) -> Result<u32, Box<dyn Error>> {
+        let (mut multiplier, mut result) = (1, 0);
+        // reversing the order isn't actually needed. The program solves the puzzle just fine
+        // without it. But reversing it means the leftmost char is actually the highest value one
+        // instead of the lowest.
+        for char in node_name.chars().rev() {
+            result += (char as u8 - b'A') as u32 * multiplier;
+            multiplier *= 26;
+        }
+        Ok(result)
+    }
 
     pub fn calculate(data_path: &str) -> Result<u64, Box<dyn Error>> {
-        let lines = reader::get_lines(data_path)?;
+        let mut lines = reader::get_lines(data_path)?;
 
-        Err("NotImplemented: This problem has not been solved yet!".into())
+        let instructions = get_instructions(&lines.next().ok_or("Data file is empty!")?)?;
+        lines.next(); // Skip empty row.
+
+        let nodes = get_nodes(&mut lines)?;
+
+        let mut current_nodes = nodes
+            .keys()
+            .filter_map(|n| if n % 26 == 0 { Some(*n) } else { None })
+            .collect::<Vec<u32>>();
+
+        let mut iterations = 0;
+
+        benchmark!("Calculation loop", {
+            loop {
+                let instruction = instructions[iterations % instructions.len()] as usize;
+                for node in current_nodes.iter_mut() {
+                    *node = nodes.get(node).ok_or("A requested node did not exist!")?[instruction];
+                }
+                iterations += 1;
+
+                if current_nodes.iter().all(|n| n % 26 == 25) {
+                    break;
+                }
+            }
+        });
+
+        Ok(iterations as u64)
     }
 }
 
