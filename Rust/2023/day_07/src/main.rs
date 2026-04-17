@@ -11,7 +11,7 @@ pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 6440;
 pub const PART_ONE_EXPECTED_VALUE: u64 = 250232501;
 
 #[allow(dead_code)]
-pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 0;
+pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 5905;
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_VALUE: u64 = 0;
 
@@ -211,6 +211,31 @@ mod part_one {
 Part Two
 ##################################################################################################
 
+Part two seems to be very similar just with one imporant change.
+Card 'J' is now a "joker" card that will "mimic" whatever card would make the hand type the most
+valuable. Meaning if a hand was earlier a ThreeOfKind but it also contained a 'J' then the 'J'
+would take the value of the existing ThreeOfKind. Making the hand a FourOfKind instead.
+
+When ordering hands if the kind is the same and the cards have to be compared directly, then 'J'
+is still itself, but with it's value has been changed to be the lowest of all cards. Making the
+new order this: A, K, Q, T, 9, 8, 7, 6, 5, 4, 3, 2, J
+
+Now, this should be fairly easy to implement as a patch on the part one code.
+First we would update the "get_kind" function. Since we represent the cards as a integer between
+0 and 12 we need to do some slight adjustments. Start by changing the offset we apply to ascii
+digits from -2 to -1. This leaves '0' unused. Then change 'J' to return a 0 instead of 9.
+And finally change 'T' to return 9 instead of 8 to make space for the offset change from earlier.
+
+Once this is done we need to update the code that creates the card groups used in the
+HandType::from_cards method. First ensure we iterate through the cards from highest value to
+lowest while skipping the final card slot for 'J'.
+Then check how many 'J' cards exist. If there are any then check through the card groups, and
+increase the largest card group by the amount of 'J' cards there are.
+
+This will result in the hand type being the best possible using any available joker, while still
+allowing the normal ordering to sort the hands correctly.
+
+Once the above has been done then the result should match the expected values for Part Two.
 */
 mod part_two {
     use crate::reader;
