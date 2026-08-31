@@ -264,6 +264,7 @@ was needed to solve it.
 mod part_two {
     use crate::reader;
     use std::{
+        cmp::min,
         error::Error,
         ops::{Add, Mul, Sub},
     };
@@ -457,6 +458,11 @@ mod part_two {
             let closest_b = other.position + other.velocity * s;
             */
 
+            /*
+            let r = diff + v1 * t - v2 * s;
+            let distance = r.dot(&r).sqrt();
+            Some(distance) // */
+
             let closest_a = p1 + (v1 * t);
             let closest_b = p2 + (v2 * s);
 
@@ -495,13 +501,22 @@ mod part_two {
         line2: &Particle,
         line3: &Particle,
     ) -> Result<Particle, Box<dyn Error>> {
-        let mut i = 4000;
+        let mut i = 1;
         let mut c = f64::MAX;
+        let mut old_i2 = -1;
+        let mut prev_i = -1;
+        let mut prev_c = c;
         loop {
             let startpoint = line1.position_after(i);
             let mut lowest_distance = f64::MAX;
-            let mut i2 = i; //1273196186888;
-            let mut i2 = 392415090000; //1273196186888;
+            let mut lowest_distance_i2 = 0;
+            let mut i2 = 0; //1273196186888;
+                            //let mut i2 = 392415090000; //1273196186888;
+
+            let mut orig_distance = -1.0;
+            let mut prev_i2 = 0;
+
+            let mut l_c = c;
             loop {
                 let endpoint = line2.position_after(i2);
                 let newline = Particle::new(startpoint, endpoint - startpoint);
@@ -510,10 +525,11 @@ mod part_two {
                     "Startpoint: {:?}\nEndpoint: {:?}\nDirection: {:?}",
                     startpoint, endpoint, newline.velocity
                 ); // */
+
                 if let Some(distance) = newline.closest_distance_to(line3) {
                     //println!("{}", distance);
-                    if distance < c {
-                        c = distance;
+                    if distance < l_c {
+                        l_c = distance;
                         //println!("New shortest: {}", c);
                     } // */
                     if distance == 0.0 {
@@ -527,23 +543,57 @@ mod part_two {
                             lowest_distance, i, i2, c
                         );
 
-                        println!("newline pos: {:?}", newline.position);
-                        println!("newline vel: {:?}", newline.velocity);
+                        //println!("newline pos: {:?}", newline.position);
+                        //println!("newline vel: {:?}", newline.velocity);
 
+                        /*
                         if c > 10000.0 {
                             //i += c as i128;
-                            i += 100;
+                            //default_i2 = (i2 as f64 * 0.50) as i128;
+                            //i += 10;
                         } // */
+                        if distance <= c {
+                            old_i2 = lowest_distance_i2;
+                            //c = distance;
+                        }
+
                         break;
+                    } else if orig_distance == -1.0 {
+                        orig_distance = distance;
                     } else {
-                        if distance > 10000.0 {
-                            i2 += 10000;
-                        } // */
+                        if old_i2 == -1 {
+                            if distance > 10000.0 {
+                                i2 += 100000;
+                            } // */
+                            i2 += 1;
+                        } else {
+                            let left_to_closest = ((distance - c) / (orig_distance - c));
+                            //println!("Ltc: {left_to_closest} d: {distance} c: {c}");
+                            let new_steps = ((old_i2 - prev_i2) as f64 * left_to_closest) / 10.0;
+                            //println!("Ns: {new_steps}");
+
+                            //let t = ((c - distance) * (1.0 - (i2 as f64 / prev_i2 as f64))) as i128;
+                            //println!("t: {t}");
+                            i2 += new_steps.max(1.0) as i128;
+                        }
+
+                        //i2 += 0 + (distance * 0.000001) as i128;
                         lowest_distance = distance;
+                        lowest_distance_i2 = i2;
+                        prev_i2 = i2;
                     }
                 }
                 i2 += 1;
             }
+
+            prev_c = c;
+            c = l_c;
+
+            let prev_step_size = i - prev_i;
+
+            let d_diff = prev_c - c;
+            let multiplier = 1.0 - (d_diff as f64 / c as f64);
+
             i += 1;
         }
     }
@@ -584,19 +634,32 @@ mod part_two {
             },
         );
 
-        println!("{:?}", link);
+        /*
+        let l1 = Particle::new(Vector3D::new(0, 0, 1), Vector3D::new(1, 0, 0));
+        let l2 = Particle::new(Vector3D::new(0, 0, 0), Vector3D::new(0, 1, 0));
+
+        if let Some(distance) = l1.closest_distance_to(&l2) {
+            println!("Distance: {distance}");
+        } // */
+
+        //println!("{:?}", link);
         link.position.x += 1;
 
-        println!("{:?}", link);
+        //println!("{:?}", link);
 
-        if let Some(distance) = newline.closest_distance_to(&particles[1]) {
+        println!(
+            "Line1: \n{:?}\nLine2: \n{:?}\nNewLine: \n{:?}\n",
+            particles[0], particles[1], link
+        );
+
+        if let Some(distance) = link.closest_distance_to(&particles[1]) {
             println!("Distance: {distance}");
         }
 
         let mut c = f64::MAX;
         for i in 0..particles.len() {
             if let Some(distance) = newline.closest_distance_to(&particles[i]) {
-                println!("Distance: {distance}");
+                //println!("Distance: {distance}");
             }
 
             for i2 in i + 1..particles.len() {
@@ -616,7 +679,19 @@ mod part_two {
         } // */
         println!("Done!");
 
-        //get_connecting_line(&particles[0], &particles[1], &particles[2])?;
+        let link = get_connecting_line(&particles[0], &particles[1], &particles[2])?;
+        for i in 0..particles.len() {
+            if let Some(distance) = link.closest_distance_to(&particles[i]) {
+                if distance == 0.0 {
+                    println!("Link - line{i}, Successful!");
+                } else {
+                    println!("Link - line{i}, Failed! {distance}");
+                }
+                //println!("Distance: {distance}");
+            } else {
+                println!("Link is parallel with line {i}");
+            }
+        }
 
         Err("NotImplemented: This problem has not been solved yet!".into())
     }
