@@ -11,7 +11,7 @@ pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 405;
 pub const PART_ONE_EXPECTED_VALUE: u64 = 29846;
 
 #[allow(dead_code)]
-pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 0;
+pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 400;
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_VALUE: u64 = 0;
 
@@ -192,6 +192,23 @@ mod part_one {
 Part Two
 ##################################################################################################
 
+So now we are supposed to first "clean" the mirrors.
+Basically, each mirror has one character that is flipped. If that character is flipped then a new
+mirror line will be possible.
+When we find this new mirror line we calculate the score the same way as before.
+
+What I am thinking is that we can use the same code as part one, but tweak the functions that
+searches for mirror lines a little.
+Since we know the mirror line we are looking for has ONE character that has been modified, the
+solution might actually be quite simple.
+If we add a bool "flipped" to the is_mirrored function and using that allow one flip for each
+is_mirrored chain then we should be able to easily get the new answer.
+However this assumes a few things that I am usure of.
+1: It assumes that there is only ONE possible mirror line per map where a character was flipped.
+2: It assumes that there is no rows/columns where more than one character is flipped.
+
+This can also be fixed by only allowing "flipped" if the tvo values actually only differ by one
+bit.
 */
 mod part_two {
     use crate::reader;
