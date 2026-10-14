@@ -56,7 +56,7 @@ This should also be fairly easy to benchmark later.
 */
 mod part_one {
     use crate::reader;
-    use std::error::Error;
+    use std::{error::Error, mem};
 
     type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -130,65 +130,46 @@ mod part_one {
             }
         }
 
-        fn simulate_beam(&mut self, beam: Beam) -> (bool, Vec<Beam>) {
-            let mut beams = Vec::new();
-            let energized = if self.energized_by == beam.id {
-                false
-            } else {
-                self.energized_by = beam.id;
-                true
-            };
+        fn simulate_beam(&mut self, beam: Beam, beam_cache: &mut Vec<Beam>) -> bool {
+            let energized = mem::replace(&mut self.energized_by, beam.id) != beam.id;
 
-            if self.last_visits[beam.direction as usize] == beam.id {
-                return (energized, beams);
+            if mem::replace(&mut self.last_visits[beam.direction as usize], beam.id) == beam.id {
+                return energized;
             }
-            self.last_visits[beam.direction as usize] = beam.id;
-            match self.cell_type {
-                CellType::Empty => {
-                    beams.push(beam.next(beam.direction)); // C: .
-                }
-                CellType::LeftMirror => {
-                    let new_dir = match beam.direction {
-                        Direction::North => Direction::West,
-                        Direction::East => Direction::South,
-                        Direction::South => Direction::East,
-                        Direction::West => Direction::North,
-                    };
-                    beams.push(beam.next(new_dir)); // C: \
-                }
-                CellType::RightMirror => {
-                    let new_dir = match beam.direction {
-                        Direction::North => Direction::East,
-                        Direction::East => Direction::North,
-                        Direction::South => Direction::West,
-                        Direction::West => Direction::South,
-                    };
-                    beams.push(beam.next(new_dir)) // C: /
-                }
-                CellType::VerticalSplitter => {
-                    match beam.direction {
-                        Direction::West | Direction::East => {
-                            beams.push(beam.next(Direction::North));
-                            beams.push(beam.next(Direction::South));
-                        }
-                        _ => {
-                            beams.push(beam.next(beam.direction));
-                        }
-                    }; // C: |
-                }
-                CellType::HorizontalSplitter => {
-                    match beam.direction {
-                        Direction::North | Direction::South => {
-                            beams.push(beam.next(Direction::East));
-                            beams.push(beam.next(Direction::West));
-                        }
-                        _ => {
-                            beams.push(beam.next(beam.direction));
-                        }
-                    }; // C: -
-                }
-            }
-            (energized, beams)
+
+            let new_dir = match self.cell_type {
+                CellType::Empty => beam.direction,
+                CellType::LeftMirror => match beam.direction {
+                    Direction::North => Direction::West,
+                    Direction::East => Direction::South,
+                    Direction::South => Direction::East,
+                    Direction::West => Direction::North,
+                },
+                CellType::RightMirror => match beam.direction {
+                    Direction::North => Direction::East,
+                    Direction::East => Direction::North,
+                    Direction::South => Direction::West,
+                    Direction::West => Direction::South,
+                },
+                CellType::VerticalSplitter => match beam.direction {
+                    Direction::West | Direction::East => {
+                        beam_cache.push(beam.next(Direction::North));
+                        Direction::South
+                    }
+                    _ => beam.direction,
+                },
+                CellType::HorizontalSplitter => match beam.direction {
+                    Direction::North | Direction::South => {
+                        beam_cache.push(beam.next(Direction::East));
+
+                        Direction::West
+                    }
+                    _ => beam.direction,
+                },
+            };
+            beam_cache.push(beam.next(new_dir));
+
+            energized
         }
 
         fn from_char(c: char) -> Result<Cell> {
@@ -209,27 +190,21 @@ mod part_one {
     }
 
     impl Map {
-        fn out_of_bounds(&self, position: &Vector) -> bool {
-            position.x < 0
-                || position.x > self.size_override as i16
-                || position.y < 0
-                || position.y > self.size_override as i16
+        fn in_range(&self, position: &Vector) -> bool {
+            (0..=self.size_override as i16).contains(&position.x)
+                && (0..=self.size_override as i16).contains(&position.y)
         }
+
         fn simulate_beam(&mut self, beam: Beam) -> u64 {
             let mut cells_energized = 0;
             let mut beams = vec![beam];
             while !beams.is_empty() {
                 let beam = beams.remove(0);
-                if !self.out_of_bounds(&beam.position) {
-                    let (newly_energized, new_beams) = self.grid[beam.position.y as usize]
+                if self.in_range(&beam.position) {
+                    let newly_energized = self.grid[beam.position.y as usize]
                         [beam.position.x as usize]
-                        .simulate_beam(beam);
-                    for beam in new_beams {
-                        beams.push(beam);
-                    }
-                    if newly_energized {
-                        cells_energized += 1;
-                    }
+                        .simulate_beam(beam, &mut beams);
+                    cells_energized += newly_energized as u64;
                 }
             }
             cells_energized
@@ -250,10 +225,14 @@ mod part_one {
             })
         }
 
-        fn draw_map(&self) {
-            for row in self.grid {
-                for cell in row {
-                    print!("{}", cell.energized_by);
+        fn draw_map(&self, beam_id: u16) {
+            for y in 0..=self.size_override {
+                for x in 0..=self.size_override {
+                    if self.grid[y][x].energized_by == beam_id {
+                        print!("#");
+                    } else {
+                        print!(" ")
+                    }
                 }
                 println!();
             }
@@ -268,7 +247,7 @@ mod part_one {
             direction: Direction::East,
         });
 
-        //map.draw_map();
+        //map.draw_map(1);
 
         Ok(energized_tiles)
     }
