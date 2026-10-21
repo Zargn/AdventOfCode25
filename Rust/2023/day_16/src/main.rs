@@ -11,7 +11,7 @@ pub const PART_ONE_EXPECTED_TEST_VALUE: u64 = 46;
 pub const PART_ONE_EXPECTED_VALUE: u64 = 6978;
 
 #[allow(dead_code)]
-pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 0;
+pub const PART_TWO_EXPECTED_TEST_VALUE: u64 = 51;
 #[allow(dead_code)]
 pub const PART_TWO_EXPECTED_VALUE: u64 = 0;
 
@@ -261,6 +261,44 @@ mod part_one {
 Part Two
 ##################################################################################################
 
+This time we are not meant to just simulate the beam from the top left, but rather we need to
+simulate one beam for each position along each edge. Then we want to figure out which beam
+energized the most tiles. The amount found is the answer we seek.
+
+Thanks to me knowing the Part Two puzzle beforehand I was able to build the part one solution to
+only require some slight modifications to solve this part.
+
+The beam simulation code doesn't need any changing at all. We just need to simulate more
+beams and save the one that energized the most tiles.
+
+After copying the Part One code all we need to do is iterate through each cell along the edges.
+(Note that cells in the 4 corners needs to have two beams simulated from them as they connect to
+two edges.)
+
+One way to do this would be to:
+Have two separate loops handling vertical and horizontal edges.
+
+mut beam_id = 1;
+
+(Horizontal edge)
+for x in 0..map.size_override
+    Top edge:
+    map.simulate_beam(Beam {
+        id: beam_id,
+        position: Vector { x: x, y: 0 },
+        direction: Direction::South,
+    });
+    beam_id += 1;
+
+    Bottom edge:
+    map.simulate_beam(Beam {
+        id: beam_id,
+        position: Vector { x: x, y: map.size_override },
+        direction: Direction::North,
+    });
+    beam_id += 1;
+
+Then basically the same again but for the y axis instead.
 */
 mod part_two {
     use crate::reader;
